@@ -7,121 +7,114 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #161310;
-    --panel: #211c17;
-    --panel-2: #2a231c;
-    --line: #372e23;
-    --ink: #f3ece2;
-    --ink-dim: #a89a87;
-    --amber: #f0a53c;
-    --amber-dim: #6b4a1f;
-    --blue: #5fa8d3;
-    --blue-dim: #2e4657;
-    --green: #6fbf73;
-    --green-dim: #2c4a2e;
-    --red: #e6614f;
+    /* cool neutral base + one accent (cobalt) — not the warm brass/espresso default */
+    --bg: #121316;
+    --panel: #191b1f;
+    --panel-2: #1e2126;
+    --line: #2b2e35;
+    --ink: #eef0f3;
+    --ink-dim: #8b909b;
+    --accent: #4f7fe0;
+    --accent-ink: #f4f7ff;
+    --amber: #d99a3d;
+    --amber-dim: #3a2f1c;
+    --green: #5fae6b;
+    --green-dim: #1e3020;
+    --red: #dc5b4d;
+    --red-dim: #3a2220;
+    --radius: 12px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    background:
-      radial-gradient(1200px 500px at 15% -10%, #2a2013 0%, transparent 60%),
-      var(--bg);
+    background: var(--bg);
     color: var(--ink);
   }
   header {
     position: sticky; top: 0; z-index: 5;
-    background: linear-gradient(180deg, #241f18 0%, #1b1712 100%);
+    background: var(--panel);
     border-bottom: 1px solid var(--line);
-    padding: 18px 20px;
+    padding: 16px 20px;
     display: flex; align-items: center; justify-content: space-between;
-    box-shadow: 0 4px 16px rgba(0,0,0,.35);
   }
   header h1 {
-    font-size: 21px; margin: 0; font-weight: 800;
-    letter-spacing: .2px;
-    display: flex; align-items: center; gap: 10px;
+    font-size: 19px; margin: 0; font-weight: 700;
   }
-  header h1 .title-wrap { display: flex; flex-direction: column; }
   header h1 .kicker {
-    font-size: 11px; font-weight: 700; letter-spacing: 1.4px;
-    color: var(--ink-dim); text-transform: uppercase; margin-top: 2px;
+    display: block; font-size: 13px; font-weight: 400;
+    color: var(--ink-dim); margin-top: 2px;
   }
   .add-btn {
-    background: linear-gradient(180deg, #f5b158, var(--amber));
-    color: #241705;
-    border: none; border-radius: 14px;
-    font-size: 16px; font-weight: 800;
-    padding: 13px 18px; cursor: pointer;
-    box-shadow: 0 3px 0 var(--amber-dim), 0 6px 14px rgba(240,165,60,.25);
-    transition: transform .12s ease, box-shadow .12s ease;
+    background: var(--accent); color: var(--accent-ink);
+    border: none; border-radius: var(--radius);
+    font-size: 15px; font-weight: 700;
+    padding: 12px 18px; cursor: pointer;
+    transition: transform .1s ease;
   }
-  .add-btn:active { transform: translateY(2px) scale(.98); box-shadow: 0 1px 0 var(--amber-dim); }
+  .add-btn:active { transform: scale(.97); }
 
   .menu-btn {
     background: transparent; color: var(--ink); border: 1px solid var(--line);
-    border-radius: 12px; font-size: 20px; line-height: 1;
-    padding: 13px 16px; cursor: pointer; margin-right: 10px;
+    border-radius: var(--radius); font-size: 18px; line-height: 1;
+    padding: 12px 15px; cursor: pointer; margin-right: 10px;
   }
-  .menu-btn:active { transform: scale(.94); }
+  .menu-btn:active { transform: scale(.95); }
 
   .menu-panel {
-    display: none; position: absolute; top: 68px; left: 20px; z-index: 8;
-    background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px;
-    padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.4); min-width: 200px;
+    display: none; position: absolute; top: 64px; left: 20px; z-index: 8;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 4px; min-width: 190px;
   }
   .menu-panel.show { display: block; }
   .menu-panel button {
     display: block; width: 100%; text-align: left; background: transparent; border: none;
-    color: var(--ink); font-size: 16px; font-weight: 700; padding: 12px 14px; border-radius: 10px; cursor: pointer;
+    color: var(--ink); font-size: 15px; font-weight: 600; padding: 12px 14px; border-radius: 8px; cursor: pointer;
   }
   .menu-panel button:active { background: var(--panel); }
 
   .history-bar { display: flex; align-items: center; gap: 10px; padding: 16px 20px 0; }
   .back-btn {
     background: transparent; border: 1px solid var(--line); color: var(--ink);
-    border-radius: 12px; padding: 10px 14px; font-size: 15px; font-weight: 700; cursor: pointer;
+    border-radius: var(--radius); padding: 10px 14px; font-size: 14px; font-weight: 600; cursor: pointer;
   }
   .back-btn:active { transform: scale(.96); }
-  .history-bar h2 { margin: 0; font-size: 18px; font-weight: 800; }
+  .history-bar h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
   .chip-row { display: flex; gap: 6px; padding: 14px 20px 0; flex-wrap: wrap; }
   .chip {
     background: transparent; color: var(--ink-dim); border: 1px solid var(--line);
-    border-radius: 999px; padding: 8px 15px; font-size: 13px; font-weight: 700; cursor: pointer;
+    border-radius: 999px; padding: 8px 15px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
-  .chip.active { background: var(--amber); color: #241705; border-color: var(--amber); }
+  .chip.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
   .date-wrap { padding: 12px 20px 0; }
   .date-wrap input[type=date] {
-    width: 100%; font-size: 15px; padding: 11px 14px; border-radius: 12px;
-    border: 1px solid var(--line); background: var(--panel); color: var(--ink); font-family: inherit;
+    width: 100%; font-size: 15px; padding: 11px 14px; border-radius: var(--radius);
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-family: inherit;
   }
-  .date-wrap input[type=date]:focus { outline: none; border-color: var(--amber); }
+  .date-wrap input[type=date]:focus { outline: none; border-color: var(--accent); }
 
   .tabs { display: flex; gap: 6px; padding: 16px 20px 0; flex-wrap: wrap; }
   .tab {
     background: transparent; color: var(--ink-dim); border: 1px solid var(--line);
     border-radius: 999px;
-    padding: 9px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
-    letter-spacing: .2px;
-    transition: background .15s ease, color .15s ease, border-color .15s ease;
+    padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
   }
-  .tab.active { background: var(--amber); color: #241705; border-color: var(--amber); }
+  .tab.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
   .search-wrap { padding: 14px 20px 0; }
   .search-wrap input {
-    width: 100%; font-size: 16px; padding: 12px 16px; border-radius: 12px;
-    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    width: 100%; font-size: 16px; padding: 12px 16px; border-radius: var(--radius);
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
     font-family: inherit;
   }
-  .search-wrap input:focus { outline: none; border-color: var(--amber); }
+  .search-wrap input:focus { outline: none; border-color: var(--accent); }
 
   .date-heading {
     grid-column: 1 / -1;
-    font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
-    color: var(--ink-dim); padding: 8px 2px 0; margin-top: 4px;
+    font-size: 13px; font-weight: 700;
+    color: var(--ink-dim); padding: 10px 2px 0; margin-top: 6px;
     border-top: 1px solid var(--line);
   }
   .date-heading:first-child { border-top: none; margin-top: 0; padding-top: 0; }
@@ -129,74 +122,70 @@
   #orders {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px; padding: 20px;
+    gap: 14px; padding: 20px;
   }
   .card {
-    background: linear-gradient(160deg, var(--panel-2), var(--panel));
-    border-radius: 16px;
-    padding: 20px 20px 20px 22px;
+    background: var(--panel);
+    border-radius: var(--radius);
+    padding: 18px 18px 18px 20px;
     border: 1px solid var(--line);
-    border-left: 4px solid transparent;
-    box-shadow: 0 8px 20px rgba(0,0,0,.25);
-    transition: border-color .2s ease, opacity .2s ease;
+    border-left: 3px solid var(--line);
   }
-  .card.status-new { border-left-color: var(--blue); }
+  .card.status-new { border-left-color: var(--accent); }
   .card.status-in_progress { border-left-color: var(--amber); }
-  .card.status-done { border-left-color: var(--green); opacity: .6; }
+  .card.status-done { border-left-color: var(--green); opacity: .65; }
 
   .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-  .card .name { font-size: 20px; font-weight: 800; word-break: break-word; letter-spacing: .1px; }
+  .card .name { font-size: 18px; font-weight: 700; word-break: break-word; }
   .card .time { font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
-  .card .items { font-size: 16px; color: var(--ink); opacity: .92; white-space: pre-wrap; margin-bottom: 8px; line-height: 1.45; }
+  .card .items { font-size: 15px; color: var(--ink); white-space: pre-wrap; margin-bottom: 8px; line-height: 1.5; }
   .card .notes {
-    font-size: 13px; color: var(--amber); margin-bottom: 16px; white-space: pre-wrap;
-    background: rgba(240,165,60,.08); border-radius: 8px; padding: 8px 10px;
+    font-size: 13px; color: var(--ink); margin-bottom: 14px; white-space: pre-wrap;
+    background: var(--panel-2); border-left: 2px solid var(--amber); padding: 8px 10px;
   }
   .badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase;
-    padding: 5px 10px; border-radius: 999px; margin-bottom: 14px;
+    display: inline-block;
+    font-size: 12px; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;
   }
-  .badge.new { background: var(--blue-dim); color: var(--blue); }
+  .badge.new { background: rgba(79,127,224,.16); color: var(--accent); }
   .badge.in_progress { background: var(--amber-dim); color: var(--amber); }
   .badge.done { background: var(--green-dim); color: var(--green); }
 
   .row { display: flex; gap: 10px; flex-wrap: wrap; }
   .btn {
-    border: none; border-radius: 12px; font-size: 15px; font-weight: 700;
+    border: none; border-radius: var(--radius); font-size: 14px; font-weight: 700;
     padding: 12px 14px; cursor: pointer; flex: 1; min-width: 90px; color: #fff;
-    transition: transform .12s ease, filter .12s ease;
+    transition: transform .1s ease;
   }
-  .btn:active { transform: scale(.96); filter: brightness(.92); }
-  .btn.blue  { background: var(--blue); color: #0d1f28; }
+  .btn:active { transform: scale(.97); }
+  .btn.blue  { background: var(--accent); color: var(--accent-ink); }
   .btn.green { background: var(--green); color: #0d2410; }
-  .btn.gray  { background: #3a3226; color: var(--ink); }
+  .btn.gray  { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); }
   .btn.red   { background: var(--red); }
 
-  .empty { text-align: center; color: var(--ink-dim); padding: 70px 20px; font-size: 17px; line-height: 1.6; }
+  .empty { text-align: center; color: var(--ink-dim); padding: 70px 20px; font-size: 16px; line-height: 1.6; }
   .empty b { color: var(--ink); }
 
   /* modal */
   .overlay {
-    position: fixed; inset: 0; background: rgba(10,8,6,.72);
-    backdrop-filter: blur(2px);
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
     display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px;
   }
   .overlay.show { display: flex; }
   .modal {
-    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 20px; padding: 26px; width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    border-radius: 16px; padding: 24px; width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto;
   }
-  .modal h2 { margin: 0 0 20px; font-size: 22px; font-weight: 800; text-align: center; }
-  .modal label { font-size: 13px; color: var(--ink-dim); display: block; margin-bottom: 8px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
+  .modal h2 { margin: 0 0 20px; font-size: 19px; font-weight: 700; text-align: center; }
+  .modal label { font-size: 13px; color: var(--ink-dim); display: block; margin-bottom: 8px; font-weight: 600; }
   .modal input[type=text], .modal input[type=password], .modal textarea {
-    width: 100%; font-size: 17px; padding: 14px; border-radius: 12px;
+    width: 100%; font-size: 16px; padding: 13px 14px; border-radius: var(--radius);
     border: 1px solid var(--line);
-    margin-bottom: 18px; background: var(--bg); color: var(--ink); font-family: inherit;
+    margin-bottom: 16px; background: var(--panel-2); color: var(--ink); font-family: inherit;
   }
-  .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--amber); }
+  .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--accent); }
   .modal textarea { min-height: 90px; resize: vertical; }
   .modal .actions { display: flex; gap: 12px; margin-top: 6px; }
   .gate .modal { text-align: center; }
@@ -208,7 +197,7 @@
 <!-- Password gate -->
 <div class="overlay gate show" id="gate">
   <div class="modal">
-    <h2>🍜 Staff Login</h2>
+    <h2>Staff Login</h2>
     <input type="password" id="pw" placeholder="Enter shared password" autocomplete="off">
     <div class="err" id="pwErr">Wrong password, try again.</div>
     <button class="btn green" style="width:100%" onclick="tryLogin()">Enter</button>
@@ -219,13 +208,13 @@
   <header>
     <div style="display:flex; align-items:center;">
       <button class="menu-btn" onclick="toggleMenu()">☰</button>
-      <h1>📋<span class="title-wrap">Order Board<span class="kicker">Viet-Cajun Kitchen</span></span></h1>
+      <h1>Order Board<span class="kicker">Viet-Cajun Kitchen</span></h1>
     </div>
     <button class="add-btn" onclick="openAdd()">+ New Order</button>
   </header>
 
   <div class="menu-panel" id="menuPanel">
-    <button onclick="openHistory()">📜 Order History</button>
+    <button onclick="openHistory()">Order History</button>
   </div>
 
   <div id="boardBar" class="tabs">
@@ -433,7 +422,7 @@ function buildCard(o) {
     <div class="top"><div class="name">${esc(o.customer_name)}</div><div class="time">${fmtTime(o.created_at)}</div></div>
     <span class="badge ${o.status}">${badgeLabel}</span>
     <div class="items">${esc(o.items)}</div>
-    ${o.notes ? `<div class="notes">📝 ${esc(o.notes)}</div>` : ''}
+    ${o.notes ? `<div class="notes">${esc(o.notes)}</div>` : ''}
     ${controls}
   `;
   return card;
