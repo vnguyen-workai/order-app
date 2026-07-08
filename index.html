@@ -594,11 +594,10 @@ function renderMenuPane() {
       const optionList = parseOptions(it.sizes);
       if (optionList.length) {
         btn.onclick = () => openOptionPicker(it.name, optionList);
-        btn.innerHTML = `${esc(it.name)}<span class="sizes-hint">${optionList.join(' / ')}</span>`;
       } else {
         btn.onclick = () => addToCart(it.name);
-        btn.innerHTML = esc(it.name);
       }
+      btn.innerHTML = esc(it.name);
       grid.appendChild(btn);
     });
     pane.appendChild(grid);
