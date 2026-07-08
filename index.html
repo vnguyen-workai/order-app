@@ -247,12 +247,18 @@
   }
   .cart-title { font-size: 13px; font-weight: 700; color: var(--ink-dim); text-transform: uppercase; margin-bottom: 10px; }
   .cart-line {
-    display: flex; justify-content: space-between; align-items: center; gap: 6px;
-    background: var(--panel-2); border-radius: 8px; padding: 8px 8px; margin-bottom: 6px;
-    font-size: 13px; cursor: pointer;
+    background: var(--panel-2); border-radius: 8px; padding: 8px; margin-bottom: 6px;
+    font-size: 13px;
   }
-  .cart-line .cart-name { flex: 1; word-break: break-word; }
-  .cart-line .cart-qty { font-weight: 800; color: var(--accent); }
+  .cart-line .cart-name { display: block; word-break: break-word; margin-bottom: 6px; }
+  .cart-qty-control { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .cart-qty-control button {
+    width: 26px; height: 26px; flex-shrink: 0; border: none; border-radius: 6px;
+    background: var(--accent); color: var(--accent-ink); font-size: 15px; font-weight: 800;
+    cursor: pointer; line-height: 1;
+  }
+  .cart-qty-control button:active { transform: scale(.92); }
+  .cart-qty-control .cart-qty { font-weight: 800; color: var(--accent); min-width: 18px; text-align: center; }
   .cart-empty { font-size: 12px; color: var(--ink-dim); line-height: 1.5; }
   .custom-add { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
   .custom-add input {
@@ -583,8 +589,16 @@ function renderCart() {
   names.forEach(name => {
     const line = document.createElement('div');
     line.className = 'cart-line';
-    line.onclick = () => decrementCart(name);
-    line.innerHTML = `<span class="cart-name">${esc(name)}</span><span class="cart-qty">x${cart[name]}</span>`;
+    line.innerHTML = `
+      <span class="cart-name">${esc(name)}</span>
+      <div class="cart-qty-control">
+        <button class="dec">−</button>
+        <span class="cart-qty">${cart[name]}</span>
+        <button class="inc">+</button>
+      </div>
+    `;
+    line.querySelector('.dec').onclick = () => decrementCart(name);
+    line.querySelector('.inc').onclick = () => addToCart(name);
     list.appendChild(line);
   });
 }
