@@ -273,6 +273,37 @@
   .order-footer textarea { min-height: 60px; resize: vertical; }
   .order-footer .actions { display: flex; gap: 12px; }
   .order-footer .checkbox-row { margin-bottom: 12px; }
+
+  /* ---------- menu settings ---------- */
+  .settings-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; }
+  .settings-section {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .settings-section .section-head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .settings-section .section-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  .settings-section .section-head button {
+    background: transparent; border: none; color: var(--red); font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 6px;
+  }
+  .settings-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px;
+  }
+  .settings-item:first-of-type { border-top: none; }
+  .settings-item button {
+    background: transparent; border: none; color: var(--red); font-size: 16px; font-weight: 800; cursor: pointer; padding: 2px 8px;
+  }
+  .settings-add-item { display: flex; gap: 8px; margin-top: 10px; }
+  .settings-add-item input {
+    flex: 1; font-size: 14px; padding: 9px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-family: inherit;
+  }
+  .settings-add-item button {
+    background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px;
+    padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -298,6 +329,7 @@
 
   <div class="menu-panel" id="menuPanel">
     <button onclick="openHistory()">Order History</button>
+    <button onclick="openMenuSettings()">Menu Settings</button>
   </div>
 
   <div id="boardBar" class="tabs">
@@ -367,11 +399,28 @@
   </div>
 </div>
 
+<!-- Menu Settings screen -->
+<div class="order-screen" id="settingsScreen" style="display:none">
+  <div class="order-header">
+    <button class="back-btn" onclick="closeMenuSettings()">← Cancel</button>
+    <h2>Menu Settings</h2>
+  </div>
+  <div class="settings-body" id="settingsBody"></div>
+  <div class="order-footer">
+    <input type="text" id="newSectionInput" placeholder="New section name (e.g. Desserts)">
+    <input type="text" id="newSectionFirstItem" placeholder="First item in this section (e.g. Che Ba Mau)">
+    <div class="actions">
+      <button class="btn green" style="flex:none; width:100%" onclick="addSection()">+ Add Section</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ================== CONFIG — fill these in from your Supabase project ================== */
 const SUPABASE_URL = 'https://cfoqlxzhtfyahhszcinl.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_mONNhGPjavlxtacViUR0PQ_t1IYJyg3';
 const SHARED_PASSWORD = '1234'; // set your staff password here
+const SETTINGS_PIN = '9999'; // separate PIN to edit the menu (keep employees from changing it by accident)
 /* ========================================================================================= */
 
 const $ = id => document.getElementById(id);
@@ -438,14 +487,23 @@ function onScheduleToggle() {
 }
 
 /* ---------- food menu + cart ---------- */
-const FOOD_MENU = [
-  { category: 'Appetizers', items: ['Spring Roll', 'Egg Roll', 'Fried Calamari', 'Edamame'] },
-  { category: 'Seafood Boil', items: ['Crawfish', 'Shrimp', 'Snow Crab Legs', 'Dungeness Crab', 'Clams', 'Mussels'] },
-  { category: 'Noodle Soup', items: ['Pho', 'Bun Bo Hue', 'Bun Rieu'] },
-  { category: 'Rice Plates', items: ['Grilled Pork Rice', 'Grilled Chicken Rice', 'Fried Rice'] },
-  { category: 'Drinks', items: ['Vietnamese Iced Coffee', 'Thai Tea', 'Soda', 'Water'] },
-];
+let menuItems = []; // raw rows from Supabase: {id, category, name, sort_order}
 let cart = {}; // { itemName: qty }
+
+async function loadMenu() {
+  const { data, error } = await sb.from('menu_items').select('*').order('category').order('sort_order');
+  if (error) { console.error(error); return; }
+  menuItems = data;
+}
+
+function menuByCategory() {
+  const map = new Map();
+  menuItems.forEach(it => {
+    if (!map.has(it.category)) map.set(it.category, []);
+    map.get(it.category).push(it);
+  });
+  return map;
+}
 
 function openOrderScreen() {
   cart = {};
@@ -460,20 +518,21 @@ function closeOrderScreen() { $('orderScreen').style.display = 'none'; }
 function renderMenuPane() {
   const pane = $('menuPane');
   pane.innerHTML = '';
-  FOOD_MENU.forEach(section => {
+  if (!menuItems.length) { pane.innerHTML = '<div class="cart-empty">No menu items yet. Add some in Menu Settings.</div>'; return; }
+  menuByCategory().forEach((items, category) => {
     const heading = document.createElement('div');
     heading.className = 'menu-category';
-    heading.textContent = section.category;
+    heading.textContent = category;
     pane.appendChild(heading);
 
     const grid = document.createElement('div');
     grid.className = 'menu-grid';
-    section.items.forEach(name => {
+    items.forEach(it => {
       const btn = document.createElement('button');
       btn.className = 'menu-item';
-      btn.dataset.name = name;
-      btn.onclick = () => addToCart(name);
-      btn.innerHTML = esc(name);
+      btn.dataset.name = it.name;
+      btn.onclick = () => addToCart(it.name);
+      btn.innerHTML = esc(it.name);
       grid.appendChild(btn);
     });
     pane.appendChild(grid);
@@ -532,6 +591,101 @@ function renderCart() {
 
 function cartToItemsString() {
   return Object.keys(cart).map(name => `${cart[name]}x ${name}`).join(', ');
+}
+
+/* ---------- menu settings ---------- */
+async function openMenuSettings() {
+  $('menuPanel').classList.remove('show');
+  const pin = prompt('Enter the Menu Settings PIN:');
+  if (pin === null) return;
+  if (pin !== SETTINGS_PIN) { alert('Wrong PIN.'); return; }
+  await loadMenu();
+  renderSettingsBody();
+  $('newSectionInput').value = ''; $('newSectionFirstItem').value = '';
+  $('settingsScreen').style.display = 'flex';
+}
+function closeMenuSettings() { $('settingsScreen').style.display = 'none'; }
+
+function renderSettingsBody() {
+  const body = $('settingsBody');
+  body.innerHTML = '';
+  if (!menuItems.length) {
+    body.innerHTML = '<div class="cart-empty">No sections yet. Add one below.</div>';
+    return;
+  }
+  menuByCategory().forEach((items, category) => {
+    const section = document.createElement('div');
+    section.className = 'settings-section';
+
+    const head = document.createElement('div');
+    head.className = 'section-head';
+    head.innerHTML = `<h3>${esc(category)}</h3>`;
+    const delSectionBtn = document.createElement('button');
+    delSectionBtn.textContent = 'Delete section';
+    delSectionBtn.onclick = () => deleteSection(category);
+    head.appendChild(delSectionBtn);
+    section.appendChild(head);
+
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'settings-item';
+      row.innerHTML = `<span>${esc(it.name)}</span>`;
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '×';
+      delBtn.onclick = () => deleteMenuItem(it.id);
+      row.appendChild(delBtn);
+      section.appendChild(row);
+    });
+
+    const addRow = document.createElement('div');
+    addRow.className = 'settings-add-item';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'New item name';
+    const addBtn = document.createElement('button');
+    addBtn.textContent = 'Add';
+    addBtn.onclick = () => addMenuItem(category, input.value, items.length);
+    addRow.appendChild(input); addRow.appendChild(addBtn);
+    section.appendChild(addRow);
+
+    body.appendChild(section);
+  });
+}
+
+async function addMenuItem(category, name, sortOrder) {
+  name = name.trim();
+  if (!name) return;
+  const { error } = await sb.from('menu_items').insert([{ category, name, sort_order: sortOrder }]);
+  if (error) { alert('Could not add item: ' + error.message); return; }
+  await loadMenu();
+  renderSettingsBody();
+}
+
+async function deleteMenuItem(id) {
+  if (!confirm('Delete this item?')) return;
+  const { error } = await sb.from('menu_items').delete().eq('id', id);
+  if (error) { alert('Could not delete item: ' + error.message); return; }
+  await loadMenu();
+  renderSettingsBody();
+}
+
+async function deleteSection(category) {
+  if (!confirm(`Delete the whole "${category}" section and all its items?`)) return;
+  const { error } = await sb.from('menu_items').delete().eq('category', category);
+  if (error) { alert('Could not delete section: ' + error.message); return; }
+  await loadMenu();
+  renderSettingsBody();
+}
+
+async function addSection() {
+  const category = $('newSectionInput').value.trim();
+  const firstItem = $('newSectionFirstItem').value.trim();
+  if (!category || !firstItem) { alert('Enter both a section name and its first item.'); return; }
+  const { error } = await sb.from('menu_items').insert([{ category, name: firstItem, sort_order: 0 }]);
+  if (error) { alert('Could not add section: ' + error.message); return; }
+  $('newSectionInput').value = ''; $('newSectionFirstItem').value = '';
+  await loadMenu();
+  renderSettingsBody();
 }
 
 /* ---------- filter (board tabs) ---------- */
@@ -698,11 +852,15 @@ function subscribeRealtime() {
   sb.channel('orders-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadOrders)
     .subscribe();
+  sb.channel('menu-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, loadMenu)
+    .subscribe();
 }
 
 /* ---------- boot ---------- */
 function boot() {
   loadOrders();
+  loadMenu();
   subscribeRealtime();
   setInterval(render, 60000); // re-check upcoming vs active as time passes
 }
