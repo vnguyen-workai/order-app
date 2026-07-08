@@ -187,7 +187,20 @@
   }
   .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--accent); }
   .modal textarea { min-height: 90px; resize: vertical; }
+  .modal input[type=datetime-local] {
+    width: 100%; font-size: 16px; padding: 13px 14px; border-radius: var(--radius);
+    border: 1px solid var(--line); margin-bottom: 16px; background: var(--panel-2); color: var(--ink); font-family: inherit;
+  }
+  .checkbox-row {
+    display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink);
+    font-weight: 600; margin-bottom: 16px; cursor: pointer;
+  }
+  .checkbox-row input { width: 18px; height: 18px; margin: 0; }
   .modal .actions { display: flex; gap: 12px; margin-top: 6px; }
+  .upcoming-tag {
+    display: inline-block; font-size: 12px; font-weight: 700; color: var(--accent);
+    background: rgba(79,127,224,.14); padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;
+  }
   .gate .modal { text-align: center; }
   .err { color: var(--red); font-size: 14px; margin: -10px 0 14px; display: none; }
 </style>
@@ -219,6 +232,7 @@
 
   <div id="boardBar" class="tabs">
     <button class="tab active" data-f="active" onclick="setFilter('active')">Active</button>
+    <button class="tab" data-f="upcoming" onclick="setFilter('upcoming')">Upcoming</button>
     <button class="tab" data-f="done" onclick="setFilter('done')">Done</button>
   </div>
 
@@ -257,6 +271,15 @@
 
     <label>Notes <small style="color:#888">(optional)</small></label>
     <textarea id="custNotes" placeholder="e.g. no spice, extra sauce on side"></textarea>
+
+    <label class="checkbox-row">
+      <input type="checkbox" id="scheduleToggle" onchange="onScheduleToggle()">
+      Schedule for later (not right now)
+    </label>
+    <div id="scheduleField" style="display:none">
+      <label>Order for</label>
+      <input type="datetime-local" id="custWhen">
+    </div>
 
     <div class="actions">
       <button class="btn gray" onclick="closeAdd()">Cancel</button>
@@ -308,7 +331,13 @@ async function addOrder() {
   const items = $('custItems').value.trim();
   const notes = $('custNotes').value.trim();
   if (!items) { alert('Add at least one item.'); return; }
-  const { error } = await sb.from('orders').insert([{ customer_name, items, notes, status: 'new' }]);
+  let order_for = null;
+  if ($('scheduleToggle').checked) {
+    const when = $('custWhen').value;
+    if (!when) { alert('Pick a date and time for this order, or uncheck "Schedule for later."'); return; }
+    order_for = new Date(when).toISOString();
+  }
+  const { error } = await sb.from('orders').insert([{ customer_name, items, notes, status: 'new', order_for }]);
   if (error) { alert('Could not save order: ' + error.message); return; }
   closeAdd();
 }
@@ -325,8 +354,12 @@ async function del(id) {
 }
 
 /* ---------- modal ---------- */
+function onScheduleToggle() {
+  $('scheduleField').style.display = $('scheduleToggle').checked ? 'block' : 'none';
+}
 function openAdd() {
   $('custName').value = ''; $('custItems').value = ''; $('custNotes').value = '';
+  $('scheduleToggle').checked = false; $('custWhen').value = ''; $('scheduleField').style.display = 'none';
   $('overlay').classList.add('show');
 }
 function closeAdd() { $('overlay').classList.remove('show'); }
@@ -395,6 +428,8 @@ function fmtDateHeading(ts) {
 }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+function isUpcoming(o) { return o.order_for && new Date(o.order_for) > new Date(); }
+
 function buildCard(o) {
   const card = document.createElement('div');
   card.className = 'card status-' + o.status;
@@ -418,9 +453,12 @@ function buildCard(o) {
     </div>`;
   }
 
+  const scheduledTag = o.order_for ? `<div class="upcoming-tag">For ${fmtTime(o.order_for)}</div>` : '';
+
   card.innerHTML = `
     <div class="top"><div class="name">${esc(o.customer_name)}</div><div class="time">${fmtTime(o.created_at)}</div></div>
     <span class="badge ${o.status}">${badgeLabel}</span>
+    ${scheduledTag}
     <div class="items">${esc(o.items)}</div>
     ${o.notes ? `<div class="notes">${esc(o.notes)}</div>` : ''}
     ${controls}
@@ -451,8 +489,12 @@ function render() {
   if (view === 'history') {
     list = orders.filter(o => inHistoryRange(o.created_at));
     if (search) list = list.filter(o => o.customer_name.toLowerCase().includes(search));
+  } else if (filter === 'done') {
+    list = orders.filter(o => o.status === 'done');
+  } else if (filter === 'upcoming') {
+    list = orders.filter(o => o.status !== 'done' && isUpcoming(o)).sort((a, b) => new Date(a.order_for) - new Date(b.order_for));
   } else {
-    list = filter === 'done' ? orders.filter(o => o.status === 'done') : orders.filter(o => o.status !== 'done');
+    list = orders.filter(o => o.status !== 'done' && !isUpcoming(o));
   }
 
   $('empty').style.display = list.length ? 'none' : 'block';
@@ -472,6 +514,9 @@ function render() {
       }
       wrap.appendChild(buildCard(o));
     });
+  } else if (filter === 'upcoming') {
+    $('empty').innerHTML = 'No upcoming orders scheduled.';
+    list.forEach(o => wrap.appendChild(buildCard(o)));
   } else {
     $('empty').innerHTML = 'No orders yet.<br>Tap <b>+ New Order</b> to add one.';
     list.forEach(o => wrap.appendChild(buildCard(o)));
@@ -489,6 +534,7 @@ function subscribeRealtime() {
 function boot() {
   loadOrders();
   subscribeRealtime();
+  setInterval(render, 60000); // re-check upcoming vs active as time passes
 }
 
 if (sessionStorage.getItem('loggedIn') === '1') {
