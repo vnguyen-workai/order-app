@@ -451,13 +451,26 @@
   </div>
 </div>
 
-<!-- Size picker -->
-<div class="overlay" id="sizeOverlay">
-  <div class="modal">
-    <h2 id="sizePickerTitle">Choose size</h2>
-    <div class="size-options" id="sizeOptions"></div>
+<!-- Option picker: shown when tapping a menu item that has options -->
+<div class="order-screen" id="optionPickerScreen" style="display:none; z-index:13;">
+  <div class="order-header">
+    <button class="back-btn" onclick="closeOptionPicker()">← Cancel</button>
+    <h2 id="optionPickerTitle">Choose an option</h2>
+  </div>
+  <div class="settings-body" id="optionPickerBody"></div>
+</div>
+
+<!-- Options editor: shown from Menu Settings to add/remove an item's options -->
+<div class="order-screen" id="optionsEditScreen" style="display:none; z-index:13;">
+  <div class="order-header">
+    <button class="back-btn" onclick="closeOptionsEdit()">← Back</button>
+    <h2 id="optionsEditTitle">Options</h2>
+  </div>
+  <div class="settings-body" id="optionsEditBody"></div>
+  <div class="order-footer">
+    <input type="text" id="newOptionInput" placeholder="Add an option (e.g. Small, Mild, Extra Spicy)">
     <div class="actions">
-      <button class="btn gray" style="width:100%" onclick="closeSizePicker()">Cancel</button>
+      <button class="btn green" style="flex:none; width:100%" onclick="addOptionToItem()">+ Add Option</button>
     </div>
   </div>
 </div>
@@ -565,7 +578,7 @@ function closeOrderScreen() { $('orderScreen').style.display = 'none'; }
 function renderMenuPane() {
   const pane = $('menuPane');
   pane.innerHTML = '';
-  if (!menuItems.length) { pane.innerHTML = '<div class="cart-empty">No menu items yet. Add some in Menu Settings.</div>'; return; }
+  if (!menuItems.length) { pane.innerHTML = '<div class="empty">No menu items yet. Add some in Menu Settings.</div>'; return; }
   menuByCategory().forEach((items, category) => {
     const heading = document.createElement('div');
     heading.className = 'menu-category';
@@ -578,10 +591,10 @@ function renderMenuPane() {
       const btn = document.createElement('button');
       btn.className = 'menu-item';
       btn.dataset.name = it.name;
-      const sizeList = parseSizes(it.sizes);
-      if (sizeList.length) {
-        btn.onclick = () => openSizePicker(it.name, sizeList);
-        btn.innerHTML = `${esc(it.name)}<span class="sizes-hint">${sizeList.join(' / ')}</span>`;
+      const optionList = parseOptions(it.sizes);
+      if (optionList.length) {
+        btn.onclick = () => openOptionPicker(it.name, optionList);
+        btn.innerHTML = `${esc(it.name)}<span class="sizes-hint">${optionList.join(' / ')}</span>`;
       } else {
         btn.onclick = () => addToCart(it.name);
         btn.innerHTML = esc(it.name);
@@ -611,8 +624,8 @@ function addCustomItem() {
   $('customItemInput').value = '';
 }
 
-function parseSizes(sizes) {
-  return (sizes || '').split(',').map(s => s.trim()).filter(Boolean);
+function parseOptions(options) {
+  return (options || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 function cartQtyForItem(name) {
   return Object.keys(cart).reduce((sum, key) => {
@@ -621,21 +634,27 @@ function cartQtyForItem(name) {
   }, 0);
 }
 
-let sizePickerName = null;
-function openSizePicker(name, sizeList) {
-  sizePickerName = name;
-  $('sizePickerTitle').textContent = name;
-  const opts = $('sizeOptions');
-  opts.innerHTML = '';
-  sizeList.forEach(size => {
+let optionPickerName = null;
+function openOptionPicker(name, optionList) {
+  optionPickerName = name;
+  $('optionPickerTitle').textContent = name;
+  const body = $('optionPickerBody');
+  body.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'menu-grid';
+  optionList.forEach(opt => {
     const btn = document.createElement('button');
-    btn.textContent = size;
-    btn.onclick = () => { addToCart(`${sizePickerName} (${size})`); closeSizePicker(); };
-    opts.appendChild(btn);
+    btn.className = 'menu-item';
+    btn.style.padding = '22px 10px';
+    btn.style.fontSize = '17px';
+    btn.textContent = opt;
+    btn.onclick = () => { addToCart(`${optionPickerName} (${opt})`); closeOptionPicker(); };
+    grid.appendChild(btn);
   });
-  $('sizeOverlay').classList.add('show');
+  body.appendChild(grid);
+  $('optionPickerScreen').style.display = 'flex';
 }
-function closeSizePicker() { $('sizeOverlay').classList.remove('show'); }
+function closeOptionPicker() { $('optionPickerScreen').style.display = 'none'; }
 
 function updateMenuBadges() {
   $('menuPane').querySelectorAll('.menu-item').forEach(btn => {
@@ -697,7 +716,7 @@ function renderSettingsBody() {
   const body = $('settingsBody');
   body.innerHTML = '';
   if (!menuItems.length) {
-    body.innerHTML = '<div class="cart-empty">No sections yet. Add one below.</div>';
+    body.innerHTML = '<div class="empty">No sections yet. Add one below.</div>';
     return;
   }
   menuByCategory().forEach((items, category) => {
@@ -716,15 +735,15 @@ function renderSettingsBody() {
     items.forEach(it => {
       const row = document.createElement('div');
       row.className = 'settings-item';
-      const sizeList = parseSizes(it.sizes);
+      const optionList = parseOptions(it.sizes);
       row.innerHTML = `<span>${esc(it.name)}</span>`;
       const rightGroup = document.createElement('div');
       rightGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      const sizesBtn = document.createElement('button');
-      sizesBtn.className = 'sizes-btn';
-      sizesBtn.textContent = sizeList.length ? `Sizes: ${sizeList.join('/')}` : '+ Sizes';
-      sizesBtn.onclick = () => editItemSizes(it.id, it.sizes);
-      rightGroup.appendChild(sizesBtn);
+      const optionsBtn = document.createElement('button');
+      optionsBtn.className = 'sizes-btn';
+      optionsBtn.textContent = optionList.length ? `Options: ${optionList.join('/')}` : '+ Options';
+      optionsBtn.onclick = () => openOptionsEdit(it.id, it.name, it.sizes);
+      rightGroup.appendChild(optionsBtn);
       const delBtn = document.createElement('button');
       delBtn.textContent = '×';
       delBtn.onclick = () => deleteMenuItem(it.id);
@@ -765,14 +784,60 @@ async function deleteMenuItem(id) {
   renderSettingsBody();
 }
 
-async function editItemSizes(id, current) {
-  const input = prompt('Enter sizes separated by commas (e.g. S,M,L). Leave blank to remove sizes:', current || '');
-  if (input === null) return;
-  const cleaned = parseSizes(input).join(',');
-  const { error } = await sb.from('menu_items').update({ sizes: cleaned || null }).eq('id', id);
-  if (error) { alert('Could not update sizes: ' + error.message); return; }
-  await loadMenu();
+let editingItemId = null;
+let editingItemOptions = [];
+
+function openOptionsEdit(id, name, current) {
+  editingItemId = id;
+  editingItemOptions = parseOptions(current);
+  $('optionsEditTitle').textContent = `${name} — Options`;
+  $('newOptionInput').value = '';
+  renderOptionsEditBody();
+  $('optionsEditScreen').style.display = 'flex';
+}
+function closeOptionsEdit() {
+  $('optionsEditScreen').style.display = 'none';
   renderSettingsBody();
+}
+function renderOptionsEditBody() {
+  const body = $('optionsEditBody');
+  body.innerHTML = '';
+  if (!editingItemOptions.length) {
+    body.innerHTML = '<div class="empty">No options yet. This item will be added straight to the cart with a single tap.<br><br>Add options below (e.g. Small, Medium, Large) to make it show a choice screen instead.</div>';
+    return;
+  }
+  const section = document.createElement('div');
+  section.className = 'settings-section';
+  editingItemOptions.forEach((opt, i) => {
+    const row = document.createElement('div');
+    row.className = 'settings-item';
+    row.innerHTML = `<span>${esc(opt)}</span>`;
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '×';
+    delBtn.onclick = () => removeOptionFromItem(i);
+    row.appendChild(delBtn);
+    section.appendChild(row);
+  });
+  body.appendChild(section);
+}
+async function saveItemOptions() {
+  const cleaned = editingItemOptions.join(',');
+  const { error } = await sb.from('menu_items').update({ sizes: cleaned || null }).eq('id', editingItemId);
+  if (error) { alert('Could not save options: ' + error.message); return; }
+  await loadMenu();
+}
+async function addOptionToItem() {
+  const val = $('newOptionInput').value.trim();
+  if (!val) return;
+  editingItemOptions.push(val);
+  $('newOptionInput').value = '';
+  renderOptionsEditBody();
+  await saveItemOptions();
+}
+async function removeOptionFromItem(index) {
+  editingItemOptions.splice(index, 1);
+  renderOptionsEditBody();
+  await saveItemOptions();
 }
 
 async function deleteSection(category) {
