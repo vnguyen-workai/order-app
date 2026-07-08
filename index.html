@@ -617,7 +617,7 @@ function renderCart() {
 }
 
 function cartToItemsString() {
-  return Object.keys(cart).map(name => `${cart[name]}x ${name}`).join(', ');
+  return Object.keys(cart).map(name => `${cart[name]}x ${name}`).join('\n');
 }
 
 /* ---------- menu settings ---------- */
