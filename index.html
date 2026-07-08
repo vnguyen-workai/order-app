@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Order Board</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #161310;
+    --panel: #211c17;
+    --panel-2: #2a231c;
+    --line: #372e23;
+    --ink: #f3ece2;
+    --ink-dim: #a89a87;
+    --amber: #f0a53c;
+    --amber-dim: #6b4a1f;
+    --blue: #5fa8d3;
+    --blue-dim: #2e4657;
+    --green: #6fbf73;
+    --green-dim: #2c4a2e;
+    --red: #e6614f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background:
+      radial-gradient(1200px 500px at 15% -10%, #2a2013 0%, transparent 60%),
+      var(--bg);
+    color: var(--ink);
+  }
+  header {
+    position: sticky; top: 0; z-index: 5;
+    background: linear-gradient(180deg, #241f18 0%, #1b1712 100%);
+    border-bottom: 1px solid var(--line);
+    padding: 18px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  }
+  header h1 {
+    font-size: 21px; margin: 0; font-weight: 800;
+    letter-spacing: .2px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  header h1 .title-wrap { display: flex; flex-direction: column; }
+  header h1 .kicker {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.4px;
+    color: var(--ink-dim); text-transform: uppercase; margin-top: 2px;
+  }
+  .add-btn {
+    background: linear-gradient(180deg, #f5b158, var(--amber));
+    color: #241705;
+    border: none; border-radius: 14px;
+    font-size: 16px; font-weight: 800;
+    padding: 13px 18px; cursor: pointer;
+    box-shadow: 0 3px 0 var(--amber-dim), 0 6px 14px rgba(240,165,60,.25);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .add-btn:active { transform: translateY(2px) scale(.98); box-shadow: 0 1px 0 var(--amber-dim); }
+
+  .tabs { display: flex; gap: 6px; padding: 16px 20px 0; flex-wrap: wrap; }
+  .tab {
+    background: transparent; color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 9px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+    letter-spacing: .2px;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .tab.active { background: var(--amber); color: #241705; border-color: var(--amber); }
+
+  #orders {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px; padding: 20px;
+  }
+  .card {
+    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    border-radius: 16px;
+    padding: 20px 20px 20px 22px;
+    border: 1px solid var(--line);
+    border-left: 4px solid transparent;
+    box-shadow: 0 8px 20px rgba(0,0,0,.25);
+    transition: border-color .2s ease, opacity .2s ease;
+  }
+  .card.status-new { border-left-color: var(--blue); }
+  .card.status-in_progress { border-left-color: var(--amber); }
+  .card.status-done { border-left-color: var(--green); opacity: .6; }
+
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .card .name { font-size: 20px; font-weight: 800; word-break: break-word; letter-spacing: .1px; }
+  .card .time { font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+  .card .items { font-size: 16px; color: var(--ink); opacity: .92; white-space: pre-wrap; margin-bottom: 8px; line-height: 1.45; }
+  .card .notes {
+    font-size: 13px; color: var(--amber); margin-bottom: 16px; white-space: pre-wrap;
+    background: rgba(240,165,60,.08); border-radius: 8px; padding: 8px 10px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase;
+    padding: 5px 10px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .badge.new { background: var(--blue-dim); color: var(--blue); }
+  .badge.in_progress { background: var(--amber-dim); color: var(--amber); }
+  .badge.done { background: var(--green-dim); color: var(--green); }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    border: none; border-radius: 12px; font-size: 15px; font-weight: 700;
+    padding: 12px 14px; cursor: pointer; flex: 1; min-width: 90px; color: #fff;
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .btn:active { transform: scale(.96); filter: brightness(.92); }
+  .btn.blue  { background: var(--blue); color: #0d1f28; }
+  .btn.green { background: var(--green); color: #0d2410; }
+  .btn.gray  { background: #3a3226; color: var(--ink); }
+  .btn.red   { background: var(--red); }
+
+  .empty { text-align: center; color: var(--ink-dim); padding: 70px 20px; font-size: 17px; line-height: 1.6; }
+  .empty b { color: var(--ink); }
+
+  /* modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(10,8,6,.72);
+    backdrop-filter: blur(2px);
+    display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: 20px; padding: 26px; width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .modal h2 { margin: 0 0 20px; font-size: 22px; font-weight: 800; text-align: center; }
+  .modal label { font-size: 13px; color: var(--ink-dim); display: block; margin-bottom: 8px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
+  .modal input[type=text], .modal input[type=password], .modal textarea {
+    width: 100%; font-size: 17px; padding: 14px; border-radius: 12px;
+    border: 1px solid var(--line);
+    margin-bottom: 18px; background: var(--bg); color: var(--ink); font-family: inherit;
+  }
+  .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--amber); }
+  .modal textarea { min-height: 90px; resize: vertical; }
+  .modal .actions { display: flex; gap: 12px; margin-top: 6px; }
+  .gate .modal { text-align: center; }
+  .err { color: var(--red); font-size: 14px; margin: -10px 0 14px; display: none; }
+</style>
+</head>
+<body>
+
+<!-- Password gate -->
+<div class="overlay gate show" id="gate">
+  <div class="modal">
+    <h2>🍜 Staff Login</h2>
+    <input type="password" id="pw" placeholder="Enter shared password" autocomplete="off">
+    <div class="err" id="pwErr">Wrong password, try again.</div>
+    <button class="btn green" style="width:100%" onclick="tryLogin()">Enter</button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>📋<span class="title-wrap">Order Board<span class="kicker">Viet-Cajun Kitchen</span></span></h1>
+    <button class="add-btn" onclick="openAdd()">+ New Order</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-f="active" onclick="setFilter('active')">Active</button>
+    <button class="tab" data-f="done" onclick="setFilter('done')">Done</button>
+    <button class="tab" data-f="all" onclick="setFilter('all')">All</button>
+  </div>
+
+  <div id="orders"></div>
+  <div class="empty" id="empty">No orders yet.<br>Tap <b>+ New Order</b> to add one.</div>
+</div>
+
+<!-- Add Order modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>New Order</h2>
+    <label>Customer name</label>
+    <input type="text" id="custName" placeholder="e.g. Sarah" autocomplete="off">
+
+    <label>Items ordered</label>
+    <textarea id="custItems" placeholder="e.g. 2x Crawfish, 1x Egg Roll"></textarea>
+
+    <label>Notes <small style="color:#888">(optional)</small></label>
+    <textarea id="custNotes" placeholder="e.g. no spice, extra sauce on side"></textarea>
+
+    <div class="actions">
+      <button class="btn gray" onclick="closeAdd()">Cancel</button>
+      <button class="btn green" onclick="addOrder()">Save Order</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================== CONFIG — fill these in from your Supabase project ================== */
+const SUPABASE_URL = 'https://cfoqlxzhtfyahhszcinl.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_mONNhGPjavlxtacViUR0PQ_t1IYJyg3';
+const SHARED_PASSWORD = '1234'; // set your staff password here
+/* ========================================================================================= */
+
+const $ = id => document.getElementById(id);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let orders = [];
+let filter = 'active';
+
+/* ---------- login gate ---------- */
+function tryLogin() {
+  if ($('pw').value === SHARED_PASSWORD) {
+    sessionStorage.setItem('loggedIn', '1');
+    $('gate').classList.remove('show');
+    $('app').style.display = 'block';
+    boot();
+  } else {
+    $('pwErr').style.display = 'block';
+  }
+}
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+
+/* ---------- data ---------- */
+async function loadOrders() {
+  const { data, error } = await sb.from('orders').select('*').order('created_at', { ascending: false });
+  if (error) { console.error(error); return; }
+  orders = data;
+  render();
+}
+
+async function addOrder() {
+  const customer_name = $('custName').value.trim() || 'Customer';
+  const items = $('custItems').value.trim();
+  const notes = $('custNotes').value.trim();
+  if (!items) { alert('Add at least one item.'); return; }
+  const { error } = await sb.from('orders').insert([{ customer_name, items, notes, status: 'new' }]);
+  if (error) { alert('Could not save order: ' + error.message); return; }
+  closeAdd();
+}
+
+async function setStatus(id, status) {
+  const { error } = await sb.from('orders').update({ status }).eq('id', id);
+  if (error) alert('Could not update order: ' + error.message);
+}
+
+async function del(id) {
+  if (!confirm('Delete this order?')) return;
+  const { error } = await sb.from('orders').delete().eq('id', id);
+  if (error) alert('Could not delete order: ' + error.message);
+}
+
+/* ---------- modal ---------- */
+function openAdd() {
+  $('custName').value = ''; $('custItems').value = ''; $('custNotes').value = '';
+  $('overlay').classList.add('show');
+}
+function closeAdd() { $('overlay').classList.remove('show'); }
+
+/* ---------- filter ---------- */
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.f === f));
+  render();
+}
+
+/* ---------- render ---------- */
+function fmtTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function render() {
+  const wrap = $('orders');
+  let list = orders;
+  if (filter === 'active') list = orders.filter(o => o.status !== 'done');
+  if (filter === 'done') list = orders.filter(o => o.status === 'done');
+
+  $('empty').style.display = list.length ? 'none' : 'block';
+  wrap.innerHTML = '';
+
+  list.forEach(o => {
+    const card = document.createElement('div');
+    card.className = 'card status-' + o.status;
+
+    const badgeLabel = o.status === 'new' ? 'New' : o.status === 'in_progress' ? 'In Progress' : 'Done';
+    let controls;
+    if (o.status === 'new') {
+      controls = `<div class="row">
+        <button class="btn blue" onclick="setStatus('${o.id}','in_progress')">Start</button>
+        <button class="btn red" onclick="del('${o.id}')">Delete</button>
+      </div>`;
+    } else if (o.status === 'in_progress') {
+      controls = `<div class="row">
+        <button class="btn green" onclick="setStatus('${o.id}','done')">Mark Done</button>
+        <button class="btn red" onclick="del('${o.id}')">Delete</button>
+      </div>`;
+    } else {
+      controls = `<div class="row">
+        <button class="btn gray" onclick="setStatus('${o.id}','new')">Reopen</button>
+        <button class="btn red" onclick="del('${o.id}')">Delete</button>
+      </div>`;
+    }
+
+    card.innerHTML = `
+      <div class="top"><div class="name">${esc(o.customer_name)}</div><div class="time">${fmtTime(o.created_at)}</div></div>
+      <span class="badge ${o.status}">${badgeLabel}</span>
+      <div class="items">${esc(o.items)}</div>
+      ${o.notes ? `<div class="notes">📝 ${esc(o.notes)}</div>` : ''}
+      ${controls}
+    `;
+    wrap.appendChild(card);
+  });
+}
+
+/* ---------- realtime ---------- */
+function subscribeRealtime() {
+  sb.channel('orders-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadOrders)
+    .subscribe();
+}
+
+/* ---------- boot ---------- */
+function boot() {
+  loadOrders();
+  subscribeRealtime();
+}
+
+if (sessionStorage.getItem('loggedIn') === '1') {
+  $('gate').classList.remove('show');
+  $('app').style.display = 'block';
+  boot();
+}
+</script>
+</body>
+</html>
