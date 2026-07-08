@@ -181,7 +181,7 @@
   /* modal */
   .overlay {
     position: fixed; inset: 0; background: rgba(10,14,26,.55);
-    display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px;
+    display: none; align-items: center; justify-content: center; z-index: 20; padding: 16px;
   }
   .overlay.show { display: flex; }
   .modal {
@@ -323,6 +323,23 @@
     background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px;
     padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
   }
+  .settings-item .sizes-tag {
+    font-size: 12px; color: var(--ink-dim); margin-right: auto; margin-left: 10px;
+  }
+  .settings-item .sizes-btn {
+    background: transparent; border: 1px solid var(--line); color: var(--accent);
+    font-size: 12px; font-weight: 700; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  }
+  .menu-item .sizes-hint {
+    display: block; font-size: 11px; color: var(--ink-dim); font-weight: 400; margin-top: 2px;
+  }
+  .size-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .size-options button {
+    flex: 1; min-width: 70px; border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--ink); border-radius: var(--radius); padding: 16px 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .size-options button:active { transform: scale(.96); background: rgba(24,104,255,.1); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -430,6 +447,17 @@
     <input type="text" id="newSectionFirstItem" placeholder="First item in this section (e.g. Che Ba Mau)">
     <div class="actions">
       <button class="btn green" style="flex:none; width:100%" onclick="addSection()">+ Add Section</button>
+    </div>
+  </div>
+</div>
+
+<!-- Size picker -->
+<div class="overlay" id="sizeOverlay">
+  <div class="modal">
+    <h2 id="sizePickerTitle">Choose size</h2>
+    <div class="size-options" id="sizeOptions"></div>
+    <div class="actions">
+      <button class="btn gray" style="width:100%" onclick="closeSizePicker()">Cancel</button>
     </div>
   </div>
 </div>
@@ -550,8 +578,14 @@ function renderMenuPane() {
       const btn = document.createElement('button');
       btn.className = 'menu-item';
       btn.dataset.name = it.name;
-      btn.onclick = () => addToCart(it.name);
-      btn.innerHTML = esc(it.name);
+      const sizeList = parseSizes(it.sizes);
+      if (sizeList.length) {
+        btn.onclick = () => openSizePicker(it.name, sizeList);
+        btn.innerHTML = `${esc(it.name)}<span class="sizes-hint">${sizeList.join(' / ')}</span>`;
+      } else {
+        btn.onclick = () => addToCart(it.name);
+        btn.innerHTML = esc(it.name);
+      }
       grid.appendChild(btn);
     });
     pane.appendChild(grid);
@@ -577,9 +611,35 @@ function addCustomItem() {
   $('customItemInput').value = '';
 }
 
+function parseSizes(sizes) {
+  return (sizes || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function cartQtyForItem(name) {
+  return Object.keys(cart).reduce((sum, key) => {
+    if (key === name || key.startsWith(name + ' (')) return sum + cart[key];
+    return sum;
+  }, 0);
+}
+
+let sizePickerName = null;
+function openSizePicker(name, sizeList) {
+  sizePickerName = name;
+  $('sizePickerTitle').textContent = name;
+  const opts = $('sizeOptions');
+  opts.innerHTML = '';
+  sizeList.forEach(size => {
+    const btn = document.createElement('button');
+    btn.textContent = size;
+    btn.onclick = () => { addToCart(`${sizePickerName} (${size})`); closeSizePicker(); };
+    opts.appendChild(btn);
+  });
+  $('sizeOverlay').classList.add('show');
+}
+function closeSizePicker() { $('sizeOverlay').classList.remove('show'); }
+
 function updateMenuBadges() {
   $('menuPane').querySelectorAll('.menu-item').forEach(btn => {
-    const qty = cart[btn.dataset.name] || 0;
+    const qty = cartQtyForItem(btn.dataset.name);
     btn.classList.toggle('picked', qty > 0);
     const existing = btn.querySelector('.qty-badge');
     if (qty > 0) {
@@ -656,11 +716,20 @@ function renderSettingsBody() {
     items.forEach(it => {
       const row = document.createElement('div');
       row.className = 'settings-item';
+      const sizeList = parseSizes(it.sizes);
       row.innerHTML = `<span>${esc(it.name)}</span>`;
+      const rightGroup = document.createElement('div');
+      rightGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      const sizesBtn = document.createElement('button');
+      sizesBtn.className = 'sizes-btn';
+      sizesBtn.textContent = sizeList.length ? `Sizes: ${sizeList.join('/')}` : '+ Sizes';
+      sizesBtn.onclick = () => editItemSizes(it.id, it.sizes);
+      rightGroup.appendChild(sizesBtn);
       const delBtn = document.createElement('button');
       delBtn.textContent = '×';
       delBtn.onclick = () => deleteMenuItem(it.id);
-      row.appendChild(delBtn);
+      rightGroup.appendChild(delBtn);
+      row.appendChild(rightGroup);
       section.appendChild(row);
     });
 
@@ -692,6 +761,16 @@ async function deleteMenuItem(id) {
   if (!confirm('Delete this item?')) return;
   const { error } = await sb.from('menu_items').delete().eq('id', id);
   if (error) { alert('Could not delete item: ' + error.message); return; }
+  await loadMenu();
+  renderSettingsBody();
+}
+
+async function editItemSizes(id, current) {
+  const input = prompt('Enter sizes separated by commas (e.g. S,M,L). Leave blank to remove sizes:', current || '');
+  if (input === null) return;
+  const cleaned = parseSizes(input).join(',');
+  const { error } = await sb.from('menu_items').update({ sizes: cleaned || null }).eq('id', id);
+  if (error) { alert('Could not update sizes: ' + error.message); return; }
   await loadMenu();
   renderSettingsBody();
 }
