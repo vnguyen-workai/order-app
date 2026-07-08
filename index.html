@@ -59,6 +59,47 @@
   }
   .add-btn:active { transform: translateY(2px) scale(.98); box-shadow: 0 1px 0 var(--amber-dim); }
 
+  .menu-btn {
+    background: transparent; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 12px; font-size: 20px; line-height: 1;
+    padding: 13px 16px; cursor: pointer; margin-right: 10px;
+  }
+  .menu-btn:active { transform: scale(.94); }
+
+  .menu-panel {
+    display: none; position: absolute; top: 68px; left: 20px; z-index: 8;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px;
+    padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.4); min-width: 200px;
+  }
+  .menu-panel.show { display: block; }
+  .menu-panel button {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    color: var(--ink); font-size: 16px; font-weight: 700; padding: 12px 14px; border-radius: 10px; cursor: pointer;
+  }
+  .menu-panel button:active { background: var(--panel); }
+
+  .history-bar { display: flex; align-items: center; gap: 10px; padding: 16px 20px 0; }
+  .back-btn {
+    background: transparent; border: 1px solid var(--line); color: var(--ink);
+    border-radius: 12px; padding: 10px 14px; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .back-btn:active { transform: scale(.96); }
+  .history-bar h2 { margin: 0; font-size: 18px; font-weight: 800; }
+
+  .chip-row { display: flex; gap: 6px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .chip {
+    background: transparent; color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 15px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .chip.active { background: var(--amber); color: #241705; border-color: var(--amber); }
+
+  .date-wrap { padding: 12px 20px 0; }
+  .date-wrap input[type=date] {
+    width: 100%; font-size: 15px; padding: 11px 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink); font-family: inherit;
+  }
+  .date-wrap input[type=date]:focus { outline: none; border-color: var(--amber); }
+
   .tabs { display: flex; gap: 6px; padding: 16px 20px 0; flex-wrap: wrap; }
   .tab {
     background: transparent; color: var(--ink-dim); border: 1px solid var(--line);
@@ -176,18 +217,39 @@
 
 <div id="app" style="display:none">
   <header>
-    <h1>📋<span class="title-wrap">Order Board<span class="kicker">Viet-Cajun Kitchen</span></span></h1>
+    <div style="display:flex; align-items:center;">
+      <button class="menu-btn" onclick="toggleMenu()">☰</button>
+      <h1>📋<span class="title-wrap">Order Board<span class="kicker">Viet-Cajun Kitchen</span></span></h1>
+    </div>
     <button class="add-btn" onclick="openAdd()">+ New Order</button>
   </header>
 
-  <div class="tabs">
-    <button class="tab active" data-f="active" onclick="setFilter('active')">Active</button>
-    <button class="tab" data-f="done" onclick="setFilter('done')">Done</button>
-    <button class="tab" data-f="history" onclick="setFilter('history')">History</button>
+  <div class="menu-panel" id="menuPanel">
+    <button onclick="openHistory()">📜 Order History</button>
   </div>
 
-  <div class="search-wrap" id="searchWrap" style="display:none">
-    <input type="text" id="searchBox" placeholder="Search by customer name..." oninput="onSearch()">
+  <div id="boardBar" class="tabs">
+    <button class="tab active" data-f="active" onclick="setFilter('active')">Active</button>
+    <button class="tab" data-f="done" onclick="setFilter('done')">Done</button>
+  </div>
+
+  <div id="historyBar" style="display:none">
+    <div class="history-bar">
+      <button class="back-btn" onclick="closeHistory()">← Back</button>
+      <h2>Order History</h2>
+    </div>
+    <div class="chip-row">
+      <button class="chip active" data-r="today" onclick="setHistoryRange('today')">Today</button>
+      <button class="chip" data-r="yesterday" onclick="setHistoryRange('yesterday')">Yesterday</button>
+      <button class="chip" data-r="7days" onclick="setHistoryRange('7days')">Last 7 Days</button>
+      <button class="chip" data-r="all" onclick="setHistoryRange('all')">All</button>
+    </div>
+    <div class="date-wrap">
+      <input type="date" id="historyDate" onchange="setHistoryDate(this.value)">
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="searchBox" placeholder="Search by customer name..." oninput="onSearch()">
+    </div>
   </div>
 
   <div id="orders"></div>
@@ -227,6 +289,9 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let orders = [];
 let filter = 'active';
 let search = '';
+let view = 'board';         // 'board' | 'history'
+let historyRange = 'today'; // 'today' | 'yesterday' | '7days' | 'all' | 'custom'
+let historyDate = null;     // 'YYYY-MM-DD' when historyRange === 'custom'
 
 /* ---------- login gate ---------- */
 function tryLogin() {
@@ -277,15 +342,51 @@ function openAdd() {
 }
 function closeAdd() { $('overlay').classList.remove('show'); }
 
-/* ---------- filter ---------- */
+/* ---------- filter (board tabs) ---------- */
 function setFilter(f) {
   filter = f;
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.f === f));
-  $('searchWrap').style.display = f === 'history' ? 'block' : 'none';
+  document.querySelectorAll('#boardBar .tab').forEach(t => t.classList.toggle('active', t.dataset.f === f));
   render();
 }
 function onSearch() {
   search = $('searchBox').value.trim().toLowerCase();
+  render();
+}
+
+/* ---------- menu ---------- */
+function toggleMenu() { $('menuPanel').classList.toggle('show'); }
+document.addEventListener('click', e => {
+  if (!$('menuPanel').contains(e.target) && e.target !== document.querySelector('.menu-btn')) {
+    $('menuPanel').classList.remove('show');
+  }
+});
+
+/* ---------- history view ---------- */
+function openHistory() {
+  $('menuPanel').classList.remove('show');
+  view = 'history';
+  $('boardBar').style.display = 'none';
+  $('historyBar').style.display = 'block';
+  render();
+}
+function closeHistory() {
+  view = 'board';
+  $('boardBar').style.display = 'flex';
+  $('historyBar').style.display = 'none';
+  render();
+}
+function setHistoryRange(r) {
+  historyRange = r;
+  historyDate = null;
+  $('historyDate').value = '';
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.r === r));
+  render();
+}
+function setHistoryDate(val) {
+  if (!val) return;
+  historyRange = 'custom';
+  historyDate = val;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
   render();
 }
 
@@ -338,20 +439,38 @@ function buildCard(o) {
   return card;
 }
 
+function inHistoryRange(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  if (historyRange === 'custom' && historyDate) return d.toDateString() === new Date(historyDate + 'T00:00:00').toDateString();
+  if (historyRange === 'today') return d.toDateString() === now.toDateString();
+  if (historyRange === 'yesterday') {
+    const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+    return d.toDateString() === yest.toDateString();
+  }
+  if (historyRange === '7days') {
+    const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 7);
+    return d >= cutoff;
+  }
+  return true; // 'all'
+}
+
 function render() {
   const wrap = $('orders');
-  let list = orders;
-  if (filter === 'active') list = orders.filter(o => o.status !== 'done');
-  if (filter === 'done') list = orders.filter(o => o.status === 'done');
-  if (filter === 'history') {
-    list = orders;
+  let list;
+
+  if (view === 'history') {
+    list = orders.filter(o => inHistoryRange(o.created_at));
     if (search) list = list.filter(o => o.customer_name.toLowerCase().includes(search));
+  } else {
+    list = filter === 'done' ? orders.filter(o => o.status === 'done') : orders.filter(o => o.status !== 'done');
   }
 
   $('empty').style.display = list.length ? 'none' : 'block';
   wrap.innerHTML = '';
 
-  if (filter === 'history') {
+  if (view === 'history') {
+    if (!list.length) $('empty').innerHTML = 'No orders found for this range.';
     let lastHeading = null;
     list.forEach(o => {
       const heading = fmtDateHeading(o.created_at);
@@ -365,6 +484,7 @@ function render() {
       wrap.appendChild(buildCard(o));
     });
   } else {
+    $('empty').innerHTML = 'No orders yet.<br>Tap <b>+ New Order</b> to add one.';
     list.forEach(o => wrap.appendChild(buildCard(o)));
   }
 }
