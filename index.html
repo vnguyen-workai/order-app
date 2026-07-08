@@ -69,6 +69,22 @@
   }
   .tab.active { background: var(--amber); color: #241705; border-color: var(--amber); }
 
+  .search-wrap { padding: 14px 20px 0; }
+  .search-wrap input {
+    width: 100%; font-size: 16px; padding: 12px 16px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    font-family: inherit;
+  }
+  .search-wrap input:focus { outline: none; border-color: var(--amber); }
+
+  .date-heading {
+    grid-column: 1 / -1;
+    font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--ink-dim); padding: 8px 2px 0; margin-top: 4px;
+    border-top: 1px solid var(--line);
+  }
+  .date-heading:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
   #orders {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -167,7 +183,11 @@
   <div class="tabs">
     <button class="tab active" data-f="active" onclick="setFilter('active')">Active</button>
     <button class="tab" data-f="done" onclick="setFilter('done')">Done</button>
-    <button class="tab" data-f="all" onclick="setFilter('all')">All</button>
+    <button class="tab" data-f="history" onclick="setFilter('history')">History</button>
+  </div>
+
+  <div class="search-wrap" id="searchWrap" style="display:none">
+    <input type="text" id="searchBox" placeholder="Search by customer name..." oninput="onSearch()">
   </div>
 
   <div id="orders"></div>
@@ -206,6 +226,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let orders = [];
 let filter = 'active';
+let search = '';
 
 /* ---------- login gate ---------- */
 function tryLogin() {
@@ -260,6 +281,11 @@ function closeAdd() { $('overlay').classList.remove('show'); }
 function setFilter(f) {
   filter = f;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.f === f));
+  $('searchWrap').style.display = f === 'history' ? 'block' : 'none';
+  render();
+}
+function onSearch() {
+  search = $('searchBox').value.trim().toLowerCase();
   render();
 }
 
@@ -268,49 +294,79 @@ function fmtTime(ts) {
   const d = new Date(ts);
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
+function fmtDateHeading(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yest = new Date(today); yest.setDate(yest.getDate() - 1);
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+  if (sameDay(d, today)) return 'Today';
+  if (sameDay(d, yest)) return 'Yesterday';
+  return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+}
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function buildCard(o) {
+  const card = document.createElement('div');
+  card.className = 'card status-' + o.status;
+
+  const badgeLabel = o.status === 'new' ? 'New' : o.status === 'in_progress' ? 'In Progress' : 'Done';
+  let controls;
+  if (o.status === 'new') {
+    controls = `<div class="row">
+      <button class="btn blue" onclick="setStatus('${o.id}','in_progress')">Start</button>
+      <button class="btn red" onclick="del('${o.id}')">Delete</button>
+    </div>`;
+  } else if (o.status === 'in_progress') {
+    controls = `<div class="row">
+      <button class="btn green" onclick="setStatus('${o.id}','done')">Mark Done</button>
+      <button class="btn red" onclick="del('${o.id}')">Delete</button>
+    </div>`;
+  } else {
+    controls = `<div class="row">
+      <button class="btn gray" onclick="setStatus('${o.id}','new')">Reopen</button>
+      <button class="btn red" onclick="del('${o.id}')">Delete</button>
+    </div>`;
+  }
+
+  card.innerHTML = `
+    <div class="top"><div class="name">${esc(o.customer_name)}</div><div class="time">${fmtTime(o.created_at)}</div></div>
+    <span class="badge ${o.status}">${badgeLabel}</span>
+    <div class="items">${esc(o.items)}</div>
+    ${o.notes ? `<div class="notes">📝 ${esc(o.notes)}</div>` : ''}
+    ${controls}
+  `;
+  return card;
+}
 
 function render() {
   const wrap = $('orders');
   let list = orders;
   if (filter === 'active') list = orders.filter(o => o.status !== 'done');
   if (filter === 'done') list = orders.filter(o => o.status === 'done');
+  if (filter === 'history') {
+    list = orders;
+    if (search) list = list.filter(o => o.customer_name.toLowerCase().includes(search));
+  }
 
   $('empty').style.display = list.length ? 'none' : 'block';
   wrap.innerHTML = '';
 
-  list.forEach(o => {
-    const card = document.createElement('div');
-    card.className = 'card status-' + o.status;
-
-    const badgeLabel = o.status === 'new' ? 'New' : o.status === 'in_progress' ? 'In Progress' : 'Done';
-    let controls;
-    if (o.status === 'new') {
-      controls = `<div class="row">
-        <button class="btn blue" onclick="setStatus('${o.id}','in_progress')">Start</button>
-        <button class="btn red" onclick="del('${o.id}')">Delete</button>
-      </div>`;
-    } else if (o.status === 'in_progress') {
-      controls = `<div class="row">
-        <button class="btn green" onclick="setStatus('${o.id}','done')">Mark Done</button>
-        <button class="btn red" onclick="del('${o.id}')">Delete</button>
-      </div>`;
-    } else {
-      controls = `<div class="row">
-        <button class="btn gray" onclick="setStatus('${o.id}','new')">Reopen</button>
-        <button class="btn red" onclick="del('${o.id}')">Delete</button>
-      </div>`;
-    }
-
-    card.innerHTML = `
-      <div class="top"><div class="name">${esc(o.customer_name)}</div><div class="time">${fmtTime(o.created_at)}</div></div>
-      <span class="badge ${o.status}">${badgeLabel}</span>
-      <div class="items">${esc(o.items)}</div>
-      ${o.notes ? `<div class="notes">📝 ${esc(o.notes)}</div>` : ''}
-      ${controls}
-    `;
-    wrap.appendChild(card);
-  });
+  if (filter === 'history') {
+    let lastHeading = null;
+    list.forEach(o => {
+      const heading = fmtDateHeading(o.created_at);
+      if (heading !== lastHeading) {
+        const h = document.createElement('div');
+        h.className = 'date-heading';
+        h.textContent = heading;
+        wrap.appendChild(h);
+        lastHeading = heading;
+      }
+      wrap.appendChild(buildCard(o));
+    });
+  } else {
+    list.forEach(o => wrap.appendChild(buildCard(o)));
+  }
 }
 
 /* ---------- realtime ---------- */
