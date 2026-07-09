@@ -483,7 +483,8 @@
   </div>
   <div class="settings-body" id="optionsEditBody"></div>
   <div class="order-footer">
-    <input type="text" id="newOptionInput" placeholder="Add an option (e.g. Small, Mild, Extra Spicy)">
+    <input type="text" id="newOptionInput" placeholder="Option name (e.g. Small)">
+    <input type="number" id="newOptionPrice" step="0.01" min="0" placeholder="Price (e.g. 2.00)">
     <div class="actions">
       <button class="btn green" style="flex:none; width:100%" onclick="addOptionToItem()">+ Add Option</button>
     </div>
@@ -639,7 +640,16 @@ function addCustomItem() {
 }
 
 function parseOptions(options) {
-  return (options || '').split(',').map(s => s.trim()).filter(Boolean);
+  return (options || '').split(',').map(s => s.trim()).filter(Boolean).map(entry => {
+    const idx = entry.lastIndexOf(':');
+    if (idx === -1) return { name: entry, price: null };
+    const name = entry.slice(0, idx).trim();
+    const price = Number(entry.slice(idx + 1).trim());
+    return { name, price: isNaN(price) ? null : price };
+  });
+}
+function serializeOptions(optionObjs) {
+  return optionObjs.map(o => `${o.name}:${o.price != null ? o.price : ''}`).join(',');
 }
 function cartQtyForItem(name) {
   return Object.keys(cart).reduce((sum, key) => {
@@ -661,8 +671,8 @@ function openOptionPicker(name, optionList) {
     btn.className = 'menu-item';
     btn.style.padding = '22px 10px';
     btn.style.fontSize = '17px';
-    btn.textContent = opt;
-    btn.onclick = () => { addToCart(`${optionPickerName} (${opt})`); closeOptionPicker(); };
+    btn.innerHTML = `${esc(opt.name)}${opt.price != null ? `<span class="sizes-hint">$${opt.price.toFixed(2)}</span>` : ''}`;
+    btn.onclick = () => { addToCart(`${optionPickerName} (${opt.name})`); closeOptionPicker(); };
     grid.appendChild(btn);
   });
   body.appendChild(grid);
@@ -688,9 +698,16 @@ function updateMenuBadges() {
 }
 
 function basePriceForCartKey(key) {
-  const m = key.match(/^(.*) \([^)]+\)$/);
-  const baseName = m ? m[1] : key;
-  const item = menuItems.find(mi => mi.name === baseName);
+  const m = key.match(/^(.*) \(([^)]+)\)$/);
+  if (m) {
+    const [, baseName, optionName] = m;
+    const item = menuItems.find(mi => mi.name === baseName);
+    if (!item) return 0;
+    const opt = parseOptions(item.sizes).find(o => o.name === optionName);
+    if (opt && opt.price != null) return opt.price;
+    return item.price != null ? Number(item.price) : 0;
+  }
+  const item = menuItems.find(mi => mi.name === key);
   return (item && item.price != null) ? Number(item.price) : 0;
 }
 
@@ -775,20 +792,24 @@ function renderSettingsBody() {
       const rightGroup = document.createElement('div');
       rightGroup.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;';
 
-      const priceWrap = document.createElement('div');
-      priceWrap.className = 'price-wrap';
-      const priceInput = document.createElement('input');
-      priceInput.type = 'number'; priceInput.step = '0.01'; priceInput.min = '0';
-      priceInput.placeholder = '0.00';
-      priceInput.value = (it.price === null || it.price === undefined) ? '' : it.price;
-      priceInput.onchange = () => updateMenuItemPrice(it.id, priceInput.value);
-      priceWrap.innerHTML = '$';
-      priceWrap.appendChild(priceInput);
-      rightGroup.appendChild(priceWrap);
+      if (!optionList.length) {
+        const priceWrap = document.createElement('div');
+        priceWrap.className = 'price-wrap';
+        const priceInput = document.createElement('input');
+        priceInput.type = 'number'; priceInput.step = '0.01'; priceInput.min = '0';
+        priceInput.placeholder = '0.00';
+        priceInput.value = (it.price === null || it.price === undefined) ? '' : it.price;
+        priceInput.onchange = () => updateMenuItemPrice(it.id, priceInput.value);
+        priceWrap.innerHTML = '$';
+        priceWrap.appendChild(priceInput);
+        rightGroup.appendChild(priceWrap);
+      }
 
       const optionsBtn = document.createElement('button');
       optionsBtn.className = 'sizes-btn';
-      optionsBtn.textContent = optionList.length ? `Options: ${optionList.join('/')}` : '+ Options';
+      optionsBtn.textContent = optionList.length
+        ? `Options: ${optionList.map(o => `${o.name} $${o.price != null ? o.price : '?'}`).join(', ')}`
+        : '+ Options';
       optionsBtn.onclick = () => openOptionsEdit(it.id, it.name, it.sizes);
       rightGroup.appendChild(optionsBtn);
       const delBtn = document.createElement('button');
@@ -846,6 +867,7 @@ function openOptionsEdit(id, name, current) {
   editingItemOptions = parseOptions(current);
   $('optionsEditTitle').textContent = `${name} — Options`;
   $('newOptionInput').value = '';
+  $('newOptionPrice').value = '';
   renderOptionsEditBody();
   $('optionsEditScreen').style.display = 'flex';
 }
@@ -857,7 +879,7 @@ function renderOptionsEditBody() {
   const body = $('optionsEditBody');
   body.innerHTML = '';
   if (!editingItemOptions.length) {
-    body.innerHTML = '<div class="empty">No options yet. This item will be added straight to the cart with a single tap.<br><br>Add options below (e.g. Small, Medium, Large) to make it show a choice screen instead.</div>';
+    body.innerHTML = '<div class="empty">No options yet. This item will be added straight to the cart with a single tap.<br><br>Add options below (e.g. Small $2, Medium $3, Large $4) to make it show a choice screen with its own price per option instead.</div>';
     return;
   }
   const section = document.createElement('div');
@@ -865,7 +887,7 @@ function renderOptionsEditBody() {
   editingItemOptions.forEach((opt, i) => {
     const row = document.createElement('div');
     row.className = 'settings-item';
-    row.innerHTML = `<span>${esc(opt)}</span>`;
+    row.innerHTML = `<span>${esc(opt.name)}</span><span class="sizes-tag">${opt.price != null ? '$' + opt.price.toFixed(2) : 'no price set'}</span>`;
     const delBtn = document.createElement('button');
     delBtn.textContent = '×';
     delBtn.onclick = () => removeOptionFromItem(i);
@@ -875,16 +897,19 @@ function renderOptionsEditBody() {
   body.appendChild(section);
 }
 async function saveItemOptions() {
-  const cleaned = editingItemOptions.join(',');
+  const cleaned = serializeOptions(editingItemOptions);
   const { error } = await sb.from('menu_items').update({ sizes: cleaned || null }).eq('id', editingItemId);
   if (error) { alert('Could not save options: ' + error.message); return; }
   await loadMenu();
 }
 async function addOptionToItem() {
-  const val = $('newOptionInput').value.trim();
-  if (!val) return;
-  editingItemOptions.push(val);
+  const name = $('newOptionInput').value.trim();
+  const priceRaw = $('newOptionPrice').value.trim();
+  if (!name) return;
+  if (priceRaw === '' || isNaN(Number(priceRaw))) { alert('Enter a price for this option.'); return; }
+  editingItemOptions.push({ name, price: Number(priceRaw) });
   $('newOptionInput').value = '';
+  $('newOptionPrice').value = '';
   renderOptionsEditBody();
   await saveItemOptions();
 }
