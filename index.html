@@ -298,12 +298,12 @@
   .cart-summary .row-line.total span:last-child { color: var(--accent); }
   .custom-add { padding-top: 14px; display: flex; gap: 8px; }
   .custom-add input { flex: 1; }
-  .cart-scroll input, .cart-scroll textarea {
+  .cart-scroll input[type=text], .cart-scroll input[type=datetime-local], .cart-scroll textarea {
     width: 100%; font-size: 15px; padding: 11px 12px; border-radius: 8px;
     border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-family: inherit;
   }
-  .cart-scroll input::placeholder, .cart-scroll textarea::placeholder { color: var(--ink-dim); }
-  .cart-scroll input:focus, .cart-scroll textarea:focus { outline: none; border-color: var(--accent); }
+  .cart-scroll input[type=text]::placeholder, .cart-scroll textarea::placeholder { color: var(--ink-dim); }
+  .cart-scroll input[type=text]:focus, .cart-scroll input[type=datetime-local]:focus, .cart-scroll textarea:focus { outline: none; border-color: var(--accent); }
   .custom-add .btn { flex: none; width: auto; padding: 11px 16px; font-size: 15px; }
   .custom-add .btn.gray { background: var(--accent); color: var(--accent-ink); border: none; }
   .cart-checkout { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
