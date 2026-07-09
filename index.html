@@ -149,9 +149,11 @@
 
   .card .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
   .card .name { font-size: 18px; font-weight: 700; word-break: break-word; }
-  .card .time-block { text-align: right; white-space: nowrap; }
-  .card .time-block .time { font-size: 14px; font-weight: 700; color: var(--ink); }
-  .card .time-block .date { font-size: 12px; color: var(--ink-dim); }
+  .pickup-block { text-align: right; white-space: nowrap; flex-shrink: 0; }
+  .pickup-label { font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--accent); text-transform: uppercase; }
+  .pickup-time { font-size: 16px; font-weight: 800; color: var(--accent); }
+  .pickup-relative { font-size: 12px; color: var(--ink-dim); }
+  .created-line { font-size: 12px; color: var(--ink-dim); margin-top: 12px; }
   .card .items { font-size: 15px; color: var(--ink); margin: 0 0 4px; line-height: 1.6; padding: 0; list-style: none; }
   .card .items li { position: relative; padding-left: 16px; }
   .card .items li::before {
@@ -1193,6 +1195,15 @@ function fmtTimeParts(ts) {
     date: d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
   };
 }
+function relativeDayLabel(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+  if (sameDay(d, today)) return 'Today';
+  if (sameDay(d, tomorrow)) return 'Tomorrow';
+  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
 function fmtDateHeading(ts) {
   const d = new Date(ts);
   const today = new Date();
@@ -1234,7 +1245,12 @@ function buildCard(o) {
     </div>`;
   }
 
-  const scheduledTag = o.order_for ? `<div class="upcoming-tag">For ${fmtTime(o.order_for)}</div>` : '';
+  const pickupBlock = o.order_for ? `
+    <div class="pickup-block">
+      <div class="pickup-label">Pickup</div>
+      <div class="pickup-time">${fmtTime(o.order_for)}</div>
+      <div class="pickup-relative">(${relativeDayLabel(o.order_for)})</div>
+    </div>` : '';
 
   const MAX_ITEMS = 5;
   const itemLines = o.items.split('\n').filter(Boolean);
@@ -1243,19 +1259,19 @@ function buildCard(o) {
   const itemsHtml = shownLines.map(line => `<li>${esc(line)}</li>`).join('');
   const moreLine = extraCount > 0 ? `<div class="more-items">+${extraCount} more item${extraCount === 1 ? '' : 's'}</div>` : '';
 
-  const { time, date } = fmtTimeParts(o.created_at);
+  const { time: createdTime, date: createdDate } = fmtTimeParts(o.created_at);
 
   card.innerHTML = `
     <div class="top">
       <div class="name">${esc(o.customer_name)}</div>
-      <div class="time-block"><div class="time">${time}</div><div class="date">${date}</div></div>
+      ${pickupBlock}
     </div>
     <span class="badge ${o.status}">${badgeLabel}</span>
-    ${scheduledTag}
     <ul class="items">${itemsHtml}</ul>
     ${moreLine}
     ${o.notes ? `<div class="notes">${esc(o.notes)}</div>` : ''}
     ${controls}
+    <div class="created-line">Created ${createdTime} • ${createdDate}</div>
   `;
   card.onclick = (e) => { if (e.target.closest('button')) return; openOrderDetail(o.id); };
   return card;
