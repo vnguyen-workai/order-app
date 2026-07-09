@@ -1228,7 +1228,7 @@ function buildCard(o) {
   const card = document.createElement('div');
   card.className = 'card status-' + o.status;
 
-  const badgeLabel = o.status === 'new' ? 'New' : o.status === 'in_progress' ? 'In Progress' : 'Done';
+  const badgeLabel = o.status === 'new' ? 'Pending' : o.status === 'in_progress' ? 'In Progress' : 'Done';
   let controls;
   if (o.status === 'new') {
     controls = `<div class="row">
@@ -1292,7 +1292,7 @@ function openOrderDetail(id) {
 function closeOrderDetail() { $('orderDetailScreen').style.display = 'none'; }
 
 function renderOrderDetail(o) {
-  const badgeLabel = o.status === 'new' ? 'New' : o.status === 'in_progress' ? 'In Progress' : 'Done';
+  const badgeLabel = o.status === 'new' ? 'Pending' : o.status === 'in_progress' ? 'In Progress' : 'Done';
   const body = $('orderDetailBody');
   body.innerHTML = `
     <div class="settings-section">
