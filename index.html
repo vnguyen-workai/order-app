@@ -141,6 +141,7 @@
     padding: 18px 18px 18px 20px;
     border: 1px solid var(--line);
     border-left: 3px solid var(--line);
+    cursor: pointer;
   }
   .card.status-new { border-left-color: var(--accent); }
   .card.status-in_progress { border-left-color: var(--amber); }
@@ -330,6 +331,13 @@
     background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px;
     padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
   }
+  .detail-name { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+  .detail-label {
+    margin: 16px 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase; color: var(--ink-dim);
+  }
+  .detail-items { white-space: pre-wrap; line-height: 1.6; font-size: 15px; }
+  .detail-total { font-size: 26px; font-weight: 800; }
   .settings-item .sizes-tag {
     font-size: 12px; color: var(--ink-dim); margin-right: auto; margin-left: 10px;
   }
@@ -471,6 +479,15 @@
   </div>
 </div>
 
+<!-- Order detail: shown when tapping an order card -->
+<div class="order-screen" id="orderDetailScreen" style="display:none; z-index:13;">
+  <div class="order-header">
+    <button class="back-btn" onclick="closeOrderDetail()">← Back</button>
+    <h2>Order Details</h2>
+  </div>
+  <div class="settings-body" id="orderDetailBody"></div>
+</div>
+
 <!-- Option picker: shown when tapping a menu item that has options -->
 <div class="order-screen" id="optionPickerScreen" style="display:none; z-index:13;">
   <div class="order-header">
@@ -546,7 +563,8 @@ async function addOrder() {
     if (!when) { alert('Pick a date and time for this order, or uncheck "Schedule for later."'); return; }
     order_for = new Date(when).toISOString();
   }
-  const { error } = await sb.from('orders').insert([{ customer_name, items, notes, status: 'new', order_for }]);
+  const total = cartTotalMoney();
+  const { error } = await sb.from('orders').insert([{ customer_name, items, notes, status: 'new', order_for, total }]);
   if (error) { alert('Could not save order: ' + error.message); return; }
   closeOrderScreen();
 }
@@ -716,12 +734,18 @@ function basePriceForCartKey(key) {
   return (item && item.price != null) ? Number(item.price) : 0;
 }
 
+function cartTotalQty() {
+  return Object.keys(cart).reduce((sum, name) => sum + cart[name], 0);
+}
+function cartTotalMoney() {
+  return Object.keys(cart).reduce((sum, name) => sum + cart[name] * basePriceForCartKey(name), 0);
+}
+
 function renderCart() {
   const list = $('cartList');
   const names = Object.keys(cart);
   $('cartEmpty').style.display = names.length ? 'none' : 'block';
   list.innerHTML = '';
-  let totalQty = 0, totalMoney = 0;
   names.forEach(name => {
     const line = document.createElement('div');
     line.className = 'cart-line';
@@ -736,9 +760,8 @@ function renderCart() {
     line.querySelector('.dec').onclick = () => decrementCart(name);
     line.querySelector('.inc').onclick = () => addToCart(name);
     list.appendChild(line);
-    totalQty += cart[name];
-    totalMoney += cart[name] * basePriceForCartKey(name);
   });
+  const totalQty = cartTotalQty(), totalMoney = cartTotalMoney();
 
   const summary = $('cartSummary');
   if (names.length) {
@@ -1076,7 +1099,41 @@ function buildCard(o) {
     ${o.notes ? `<div class="notes">${esc(o.notes)}</div>` : ''}
     ${controls}
   `;
+  card.onclick = (e) => { if (e.target.closest('button')) return; openOrderDetail(o.id); };
   return card;
+}
+
+let detailOrderId = null;
+function openOrderDetail(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  detailOrderId = id;
+  renderOrderDetail(o);
+  $('orderDetailScreen').style.display = 'flex';
+}
+function closeOrderDetail() { $('orderDetailScreen').style.display = 'none'; }
+
+function renderOrderDetail(o) {
+  const badgeLabel = o.status === 'new' ? 'New' : o.status === 'in_progress' ? 'In Progress' : 'Done';
+  const body = $('orderDetailBody');
+  body.innerHTML = `
+    <div class="settings-section">
+      <div class="detail-name">${esc(o.customer_name)}</div>
+      <span class="badge ${o.status}">${badgeLabel}</span>
+      ${o.order_for ? `<div class="upcoming-tag">For ${fmtTime(o.order_for)}</div>` : ''}
+
+      <div class="detail-label">Placed</div>
+      <div>${fmtTime(o.created_at)}</div>
+
+      <div class="detail-label">Items</div>
+      <div class="detail-items">${esc(o.items)}</div>
+
+      ${o.notes ? `<div class="detail-label">Notes</div><div class="notes" style="margin-bottom:0;">${esc(o.notes)}</div>` : ''}
+
+      <div class="detail-label">Total</div>
+      <div class="detail-total">${o.total != null ? '$' + Number(o.total).toFixed(2) : 'Not recorded'}</div>
+    </div>
+  `;
 }
 
 function inHistoryRange(ts) {
