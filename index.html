@@ -1036,7 +1036,7 @@ function render() {
   let list;
 
   if (view === 'history') {
-    list = orders.filter(o => inHistoryRange(o.created_at));
+    list = orders.filter(o => o.status === 'done' && inHistoryRange(o.created_at));
     if (search) list = list.filter(o => o.customer_name.toLowerCase().includes(search));
   } else if (filter === 'done') {
     list = orders.filter(o => o.status === 'done');
