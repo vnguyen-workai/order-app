@@ -232,25 +232,37 @@
 
   .order-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 
-  .menu-pane { flex: 1; overflow-y: auto; padding: 16px; background: var(--bg); }
+  .menu-pane { flex: 1; overflow-y: auto; padding: 20px; background: var(--bg); }
+  .menu-search { margin-bottom: 16px; }
+  .menu-search input {
+    width: 100%; font-size: 15px; padding: 13px 16px; border-radius: var(--radius);
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-family: inherit;
+  }
+  .menu-search input:focus { outline: none; border-color: var(--accent); }
+  .menu-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .menu-chips .chip.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
   .menu-category {
-    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
-    color: var(--ink-dim); margin: 18px 0 8px;
+    font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--ink-dim); margin: 24px 0 12px;
   }
   .menu-category:first-child { margin-top: 0; }
-  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
   .menu-item {
     position: relative; background: var(--surface); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 14px 10px; color: var(--ink);
-    font-size: 14px; font-weight: 600; text-align: center; cursor: pointer;
+    border-radius: 16px; padding: 22px 14px; color: var(--ink);
+    font-size: 16px; font-weight: 700; text-align: center; cursor: pointer;
+    box-shadow: 0 1px 2px rgba(16,26,64,.04);
+    transition: transform .1s ease, border-color .1s ease, box-shadow .1s ease;
   }
-  .menu-item:active { transform: scale(.96); }
-  .menu-item.picked { border-color: var(--accent); background: rgba(24,104,255,.08); }
+  .menu-item:active { transform: scale(.97); }
+  .menu-item:hover { border-color: var(--accent); box-shadow: 0 4px 12px rgba(24,104,255,.1); }
+  .menu-item.picked { border-color: var(--accent); background: rgba(24,104,255,.06); }
   .menu-item .qty-badge {
-    position: absolute; top: -8px; right: -8px;
+    position: absolute; top: -10px; right: -10px;
     background: var(--accent); color: var(--accent-ink);
-    font-size: 12px; font-weight: 800; min-width: 22px; height: 22px; border-radius: 999px;
-    display: flex; align-items: center; justify-content: center; padding: 0 4px;
+    font-size: 13px; font-weight: 800; min-width: 26px; height: 26px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center; padding: 0 5px;
+    box-shadow: 0 2px 6px rgba(24,104,255,.35);
   }
 
   .cart-pane {
@@ -300,6 +312,12 @@
   .order-footer textarea { min-height: 60px; resize: vertical; }
   .order-footer .actions { display: flex; gap: 12px; }
   .order-footer .checkbox-row { margin-bottom: 12px; }
+  .footer-toggles { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .footer-toggles .chip {
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 15px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .footer-toggles .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
   /* ---------- menu settings ---------- */
   .settings-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
@@ -432,7 +450,11 @@
   </div>
 
   <div class="order-body">
-    <div class="menu-pane" id="menuPane"></div>
+    <div class="menu-pane" id="menuPane">
+      <div class="menu-search"><input type="text" id="menuSearch" placeholder="Search menu items..." oninput="onMenuSearch()"></div>
+      <div class="menu-chips" id="menuChips"></div>
+      <div id="menuList"></div>
+    </div>
     <div class="cart-pane" id="cartPane">
       <div class="cart-title">Order</div>
       <div id="cartList"></div>
@@ -447,11 +469,16 @@
 
   <div class="order-footer">
     <input type="text" id="custName" placeholder="Customer name" autocomplete="off">
-    <textarea id="custNotes" placeholder="Notes (optional): no spice, extra sauce..."></textarea>
-    <label class="checkbox-row">
-      <input type="checkbox" id="scheduleToggle" onchange="onScheduleToggle()">
-      Schedule for later (not right now)
-    </label>
+    <div class="footer-toggles">
+      <button type="button" class="chip" id="noteToggleBtn" onclick="toggleNoteField()">+ Add Note</button>
+      <label class="checkbox-row" style="margin:0;">
+        <input type="checkbox" id="scheduleToggle" onchange="onScheduleToggle()">
+        Schedule for later
+      </label>
+    </div>
+    <div id="noteField" style="display:none">
+      <textarea id="custNotes" placeholder="Notes: no spice, extra sauce..."></textarea>
+    </div>
     <div id="scheduleField" style="display:none">
       <label>Order for</label>
       <input type="datetime-local" id="custWhen">
@@ -604,29 +631,73 @@ function menuByCategory() {
   return map;
 }
 
+let menuSearchTerm = '';
+let menuActiveCategory = 'all';
+
 function openOrderScreen() {
   cart = {};
   $('custName').value = ''; $('custNotes').value = ''; $('customItemInput').value = '';
   $('scheduleToggle').checked = false; $('custWhen').value = ''; $('scheduleField').style.display = 'none';
+  $('menuSearch').value = ''; menuSearchTerm = ''; menuActiveCategory = 'all';
+  $('noteField').style.display = 'none';
+  $('noteToggleBtn').classList.remove('on');
+  $('noteToggleBtn').textContent = '+ Add Note';
+  renderMenuChips();
   renderMenuPane();
   renderCart();
   $('orderScreen').style.display = 'flex';
 }
 function closeOrderScreen() { $('orderScreen').style.display = 'none'; }
 
+function onMenuSearch() {
+  menuSearchTerm = $('menuSearch').value.trim().toLowerCase();
+  renderMenuPane();
+}
+function setMenuCategory(cat) {
+  menuActiveCategory = cat;
+  renderMenuChips();
+  renderMenuPane();
+}
+function toggleNoteField() {
+  const open = $('noteField').style.display === 'none';
+  $('noteField').style.display = open ? 'block' : 'none';
+  $('noteToggleBtn').classList.toggle('on', open);
+  $('noteToggleBtn').textContent = open ? 'Note ✓' : '+ Add Note';
+  if (open) $('custNotes').focus();
+}
+
+function renderMenuChips() {
+  const wrap = $('menuChips');
+  wrap.innerHTML = '';
+  const cats = ['all', ...menuByCategory().keys()];
+  cats.forEach(cat => {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (menuActiveCategory === cat ? ' active' : '');
+    chip.textContent = cat === 'all' ? 'All' : cat;
+    chip.onclick = () => setMenuCategory(cat);
+    wrap.appendChild(chip);
+  });
+}
+
 function renderMenuPane() {
-  const pane = $('menuPane');
-  pane.innerHTML = '';
-  if (!menuItems.length) { pane.innerHTML = '<div class="empty">No menu items yet. Add some in Menu Settings.</div>'; return; }
+  const list = $('menuList');
+  list.innerHTML = '';
+  if (!menuItems.length) { list.innerHTML = '<div class="empty">No menu items yet. Add some in Menu Settings.</div>'; return; }
+  let anyShown = false;
   menuByCategory().forEach((items, category) => {
+    if (menuActiveCategory !== 'all' && menuActiveCategory !== category) return;
+    const shownItems = items.filter(it => !menuSearchTerm || it.name.toLowerCase().includes(menuSearchTerm));
+    if (!shownItems.length) return;
+    anyShown = true;
+
     const heading = document.createElement('div');
     heading.className = 'menu-category';
     heading.textContent = category;
-    pane.appendChild(heading);
+    list.appendChild(heading);
 
     const grid = document.createElement('div');
     grid.className = 'menu-grid';
-    items.forEach(it => {
+    shownItems.forEach(it => {
       const btn = document.createElement('button');
       btn.className = 'menu-item';
       btn.dataset.name = it.name;
@@ -639,8 +710,10 @@ function renderMenuPane() {
       btn.innerHTML = esc(it.name);
       grid.appendChild(btn);
     });
-    pane.appendChild(grid);
+    list.appendChild(grid);
   });
+  if (!anyShown) list.innerHTML = '<div class="empty">No items match your search.</div>';
+  updateMenuBadges();
 }
 
 function addToCart(name) {
