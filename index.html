@@ -484,7 +484,7 @@
   <div class="settings-body" id="optionsEditBody"></div>
   <div class="order-footer">
     <input type="text" id="newOptionInput" placeholder="Option name (e.g. Small)">
-    <input type="number" id="newOptionPrice" step="0.01" min="0" placeholder="Price (e.g. 2.00)">
+    <input type="number" id="newOptionPrice" step="0.01" min="0" placeholder="Price (optional, blank = $0)">
     <div class="actions">
       <button class="btn green" style="flex:none; width:100%" onclick="addOptionToItem()">+ Add Option</button>
     </div>
@@ -906,8 +906,8 @@ async function addOptionToItem() {
   const name = $('newOptionInput').value.trim();
   const priceRaw = $('newOptionPrice').value.trim();
   if (!name) return;
-  if (priceRaw === '' || isNaN(Number(priceRaw))) { alert('Enter a price for this option.'); return; }
-  editingItemOptions.push({ name, price: Number(priceRaw) });
+  const price = (priceRaw === '' || isNaN(Number(priceRaw))) ? 0 : Number(priceRaw);
+  editingItemOptions.push({ name, price });
   $('newOptionInput').value = '';
   $('newOptionPrice').value = '';
   renderOptionsEditBody();
