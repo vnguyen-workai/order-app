@@ -661,6 +661,13 @@ async function del(id) {
   if (error) alert('Could not delete order: ' + error.message);
 }
 
+async function delDone(id) {
+  const pin = prompt('This order is marked Done. Enter the PIN to delete it:');
+  if (pin === null) return;
+  if (pin !== SETTINGS_PIN) { alert('Wrong PIN.'); return; }
+  await del(id);
+}
+
 /* ---------- schedule toggle ---------- */
 function onScheduleToggle() {
   $('scheduleField').style.display = $('scheduleToggle').checked ? 'block' : 'none';
@@ -1242,8 +1249,7 @@ function buildCard(o) {
     </div>`;
   } else {
     controls = `<div class="row">
-      <button class="btn btn-pill btn-outline-gray" onclick="setStatus('${o.id}','new')">↺ Reopen</button>
-      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">Delete</button>
+      <button class="btn btn-pill btn-outline-red" onclick="delDone('${o.id}')">Delete</button>
     </div>`;
   }
 
