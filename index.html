@@ -383,7 +383,7 @@
   </div>
 
   <div id="boardBar" class="tabs">
-    <button class="tab active" data-f="active" onclick="setFilter('active')">Active</button>
+    <button class="tab active" data-f="active" onclick="setFilter('active')">Today</button>
     <button class="tab" data-f="upcoming" onclick="setFilter('upcoming')">Upcoming</button>
     <button class="tab" data-f="done" onclick="setFilter('done')">Done</button>
   </div>
@@ -977,7 +977,12 @@ function fmtDateHeading(ts) {
 }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-function isUpcoming(o) { return o.order_for && new Date(o.order_for) > new Date(); }
+function isUpcoming(o) {
+  if (!o.order_for) return false;
+  const orderDate = new Date(o.order_for);
+  const today = new Date();
+  return orderDate.toDateString() !== today.toDateString() && orderDate > today;
+}
 
 function buildCard(o) {
   const card = document.createElement('div');
