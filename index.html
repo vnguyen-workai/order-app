@@ -142,7 +142,9 @@
     border: 1px solid var(--line);
     border-left: 3px solid var(--line);
     cursor: pointer;
+    display: flex; flex-direction: column;
   }
+  .card-footer { margin-top: auto; padding-top: 14px; }
   .card.status-new { border-left-color: var(--accent); }
   .card.status-in_progress { border-left-color: var(--amber); }
   .card.status-done { border-left-color: var(--green); opacity: .7; }
@@ -1270,8 +1272,10 @@ function buildCard(o) {
     <ul class="items">${itemsHtml}</ul>
     ${moreLine}
     ${o.notes ? `<div class="notes">${esc(o.notes)}</div>` : ''}
-    ${controls}
-    <div class="created-line">Created ${createdTime} • ${createdDate}</div>
+    <div class="card-footer">
+      ${controls}
+      <div class="created-line">Created ${createdTime} • ${createdDate}</div>
+    </div>
   `;
   card.onclick = (e) => { if (e.target.closest('button')) return; openOrderDetail(o.id); };
   return card;
