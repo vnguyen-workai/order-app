@@ -340,6 +340,11 @@
   .price-wrap {
     display: flex; align-items: center; gap: 2px; font-size: 13px; color: var(--ink-dim); font-weight: 700;
   }
+  .option-name-input {
+    flex: 1; min-width: 0; font-size: 14px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-family: inherit;
+  }
+  .option-name-input:focus, .price-wrap input:focus { outline: none; border-color: var(--accent); }
   .price-wrap input {
     width: 56px; font-size: 13px; padding: 6px 6px; border-radius: 6px;
     border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-family: inherit;
@@ -887,10 +892,27 @@ function renderOptionsEditBody() {
   editingItemOptions.forEach((opt, i) => {
     const row = document.createElement('div');
     row.className = 'settings-item';
-    row.innerHTML = `<span>${esc(opt.name)}</span><span class="sizes-tag">${opt.price != null ? '$' + opt.price.toFixed(2) : 'no price set'}</span>`;
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text'; nameInput.className = 'option-name-input';
+    nameInput.value = opt.name;
+    nameInput.onchange = () => editOptionField(i, 'name', nameInput.value);
+
+    const priceWrap = document.createElement('div');
+    priceWrap.className = 'price-wrap';
+    const priceInput = document.createElement('input');
+    priceInput.type = 'number'; priceInput.step = '0.01'; priceInput.min = '0';
+    priceInput.value = opt.price != null ? opt.price : 0;
+    priceInput.onchange = () => editOptionField(i, 'price', priceInput.value);
+    priceWrap.innerHTML = '$';
+    priceWrap.appendChild(priceInput);
+
     const delBtn = document.createElement('button');
     delBtn.textContent = '×';
     delBtn.onclick = () => removeOptionFromItem(i);
+
+    row.appendChild(nameInput);
+    row.appendChild(priceWrap);
     row.appendChild(delBtn);
     section.appendChild(row);
   });
@@ -916,6 +938,18 @@ async function addOptionToItem() {
 async function removeOptionFromItem(index) {
   editingItemOptions.splice(index, 1);
   renderOptionsEditBody();
+  await saveItemOptions();
+}
+
+async function editOptionField(index, field, value) {
+  if (field === 'name') {
+    const name = value.trim();
+    if (!name) { renderOptionsEditBody(); return; }
+    editingItemOptions[index].name = name;
+  } else {
+    const price = (value.trim() === '' || isNaN(Number(value))) ? 0 : Number(value);
+    editingItemOptions[index].price = price;
+  }
   await saveItemOptions();
 }
 
