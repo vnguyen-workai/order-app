@@ -1220,17 +1220,17 @@ function buildCard(o) {
   if (o.status === 'new') {
     controls = `<div class="row">
       <button class="btn btn-pill btn-solid-blue" onclick="setStatus('${o.id}','in_progress')">▶ Start</button>
-      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">🗑 Delete</button>
+      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">Delete</button>
     </div>`;
   } else if (o.status === 'in_progress') {
     controls = `<div class="row">
       <button class="btn btn-pill btn-solid-green" onclick="setStatus('${o.id}','done')">✓ Mark Done</button>
-      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">🗑 Delete</button>
+      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">Delete</button>
     </div>`;
   } else {
     controls = `<div class="row">
       <button class="btn btn-pill btn-outline-gray" onclick="setStatus('${o.id}','new')">↺ Reopen</button>
-      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">🗑 Delete</button>
+      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">Delete</button>
     </div>`;
   }
 
