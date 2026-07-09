@@ -147,10 +147,18 @@
   .card.status-in_progress { border-left-color: var(--amber); }
   .card.status-done { border-left-color: var(--green); opacity: .7; }
 
-  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .card .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
   .card .name { font-size: 18px; font-weight: 700; word-break: break-word; }
-  .card .time { font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
-  .card .items { font-size: 15px; color: var(--ink); white-space: pre-wrap; margin-bottom: 8px; line-height: 1.5; }
+  .card .time-block { text-align: right; white-space: nowrap; }
+  .card .time-block .time { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .card .time-block .date { font-size: 12px; color: var(--ink-dim); }
+  .card .items { font-size: 15px; color: var(--ink); margin: 0 0 4px; line-height: 1.6; padding: 0; list-style: none; }
+  .card .items li { position: relative; padding-left: 16px; }
+  .card .items li::before {
+    content: ''; position: absolute; left: 0; top: 9px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  }
+  .more-items { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
   .card .notes {
     font-size: 13px; color: var(--ink); margin-bottom: 14px; white-space: pre-wrap;
     background: var(--surface-2); border-left: 2px solid var(--amber); padding: 8px 10px;
@@ -175,6 +183,11 @@
   .btn.green { background: var(--green); color: #fff; }
   .btn.gray  { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
   .btn.red   { background: var(--red); }
+  .btn-pill { border-radius: 999px; }
+  .btn-solid-blue { background: var(--accent); color: var(--accent-ink); border: none; }
+  .btn-solid-green { background: var(--green); color: #fff; border: none; }
+  .btn-outline-red { background: var(--surface); color: var(--red); border: 1.5px solid var(--red); }
+  .btn-outline-gray { background: var(--surface); color: var(--ink-dim); border: 1.5px solid var(--line); }
 
   .empty { text-align: center; color: var(--ink-dim); padding: 70px 20px; font-size: 16px; line-height: 1.6; }
   .empty b { color: var(--ink); }
@@ -1173,6 +1186,13 @@ function fmtTime(ts) {
   const d = new Date(ts);
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
+function fmtTimeParts(ts) {
+  const d = new Date(ts);
+  return {
+    time: d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+    date: d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+  };
+}
 function fmtDateHeading(ts) {
   const d = new Date(ts);
   const today = new Date();
@@ -1199,28 +1219,41 @@ function buildCard(o) {
   let controls;
   if (o.status === 'new') {
     controls = `<div class="row">
-      <button class="btn blue" onclick="setStatus('${o.id}','in_progress')">Start</button>
-      <button class="btn red" onclick="del('${o.id}')">Delete</button>
+      <button class="btn btn-pill btn-solid-blue" onclick="setStatus('${o.id}','in_progress')">▶ Start</button>
+      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">🗑 Delete</button>
     </div>`;
   } else if (o.status === 'in_progress') {
     controls = `<div class="row">
-      <button class="btn green" onclick="setStatus('${o.id}','done')">Mark Done</button>
-      <button class="btn red" onclick="del('${o.id}')">Delete</button>
+      <button class="btn btn-pill btn-solid-green" onclick="setStatus('${o.id}','done')">✓ Mark Done</button>
+      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">🗑 Delete</button>
     </div>`;
   } else {
     controls = `<div class="row">
-      <button class="btn gray" onclick="setStatus('${o.id}','new')">Reopen</button>
-      <button class="btn red" onclick="del('${o.id}')">Delete</button>
+      <button class="btn btn-pill btn-outline-gray" onclick="setStatus('${o.id}','new')">↺ Reopen</button>
+      <button class="btn btn-pill btn-outline-red" onclick="del('${o.id}')">🗑 Delete</button>
     </div>`;
   }
 
   const scheduledTag = o.order_for ? `<div class="upcoming-tag">For ${fmtTime(o.order_for)}</div>` : '';
 
+  const MAX_ITEMS = 5;
+  const itemLines = o.items.split('\n').filter(Boolean);
+  const shownLines = itemLines.slice(0, MAX_ITEMS);
+  const extraCount = itemLines.length - shownLines.length;
+  const itemsHtml = shownLines.map(line => `<li>${esc(line)}</li>`).join('');
+  const moreLine = extraCount > 0 ? `<div class="more-items">+${extraCount} more item${extraCount === 1 ? '' : 's'}</div>` : '';
+
+  const { time, date } = fmtTimeParts(o.created_at);
+
   card.innerHTML = `
-    <div class="top"><div class="name">${esc(o.customer_name)}</div><div class="time">${fmtTime(o.created_at)}</div></div>
+    <div class="top">
+      <div class="name">${esc(o.customer_name)}</div>
+      <div class="time-block"><div class="time">${time}</div><div class="date">${date}</div></div>
+    </div>
     <span class="badge ${o.status}">${badgeLabel}</span>
     ${scheduledTag}
-    <div class="items">${esc(o.items)}</div>
+    <ul class="items">${itemsHtml}</ul>
+    ${moreLine}
     ${o.notes ? `<div class="notes">${esc(o.notes)}</div>` : ''}
     ${controls}
   `;
