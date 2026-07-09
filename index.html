@@ -297,7 +297,8 @@
   .cart-summary .row-line.total { font-size: 20px; font-weight: 800; }
   .cart-summary .row-line.total span:last-child { color: var(--accent); }
   .custom-add { padding-top: 14px; display: flex; gap: 8px; }
-  .custom-add input { flex: 1; }
+  .custom-add input#customItemInput { flex: 1; }
+  .custom-add input#customItemPrice { width: 80px; flex: none; }
   .cart-scroll input[type=text], .cart-scroll input[type=datetime-local], .cart-scroll textarea {
     width: 100%; font-size: 15px; padding: 11px 12px; border-radius: 8px;
     border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-family: inherit;
@@ -492,6 +493,7 @@
         <div class="cart-summary" id="cartSummary" style="display:none"></div>
         <div class="custom-add">
           <input type="text" id="customItemInput" placeholder="Other item...">
+          <input type="number" id="customItemPrice" step="0.01" min="0" placeholder="$0.00">
           <button class="btn gray" onclick="addCustomItem()">Add</button>
         </div>
         <div class="cart-checkout">
@@ -671,7 +673,8 @@ let menuActiveCategory = 'all';
 
 function openOrderScreen() {
   cart = {};
-  $('custName').value = ''; $('custNotes').value = ''; $('customItemInput').value = '';
+  customPrices = {};
+  $('custName').value = ''; $('custNotes').value = ''; $('customItemInput').value = ''; $('customItemPrice').value = '';
   $('scheduleToggle').checked = false; $('custWhen').value = ''; $('scheduleField').style.display = 'none';
   $('menuSearch').value = ''; menuSearchTerm = ''; menuActiveCategory = 'all';
   $('noteField').style.display = 'none';
@@ -764,11 +767,16 @@ function decrementCart(name) {
   renderCart();
   updateMenuBadges();
 }
+let customPrices = {}; // { itemName: price } for "Other item" entries this order
+
 function addCustomItem() {
   const name = $('customItemInput').value.trim();
   if (!name) return;
+  const priceRaw = $('customItemPrice').value.trim();
+  customPrices[name] = (priceRaw === '' || isNaN(Number(priceRaw))) ? 0 : Number(priceRaw);
   addToCart(name);
   $('customItemInput').value = '';
+  $('customItemPrice').value = '';
 }
 
 function parseOptions(options) {
@@ -840,7 +848,8 @@ function basePriceForCartKey(key) {
     return item.price != null ? Number(item.price) : 0;
   }
   const item = menuItems.find(mi => mi.name === key);
-  return (item && item.price != null) ? Number(item.price) : 0;
+  if (item) return item.price != null ? Number(item.price) : 0;
+  return customPrices[key] != null ? customPrices[key] : 0;
 }
 
 function cartTotalQty() {
