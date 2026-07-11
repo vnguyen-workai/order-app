@@ -90,7 +90,23 @@
     border-radius: var(--radius); padding: 10px 14px; font-size: 14px; font-weight: 600; cursor: pointer;
   }
   .back-btn:active { transform: scale(.96); }
-  .history-bar h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--ink-on-chrome); }
+  .history-bar h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--ink-on-chrome); flex: 1; }
+  .report-btn {
+    background: transparent; color: var(--ink-on-chrome); border: 1px solid var(--chrome-line);
+    border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .report-btn:active { transform: scale(.96); }
+  .report-panel {
+    background: var(--surface); border-bottom: 1px solid var(--line);
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .report-panel label { font-size: 13px; color: var(--ink-dim); font-weight: 600; }
+  .report-panel input[type=date] {
+    width: 100%; font-size: 15px; padding: 11px 14px; border-radius: var(--radius);
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-family: inherit;
+  }
+  .report-panel input[type=date]:focus { outline: none; border-color: var(--accent); }
 
   .chip-row { display: flex; gap: 6px; padding: 14px 20px 0; flex-wrap: wrap; }
   .chip {
@@ -428,6 +444,22 @@
     font-size: 15px; font-weight: 700; cursor: pointer;
   }
   .size-options button:active { transform: scale(.96); background: rgba(24,104,255,.1); border-color: var(--accent); }
+
+  /* ---------- print report ---------- */
+  .print-report { display: none; }
+  .print-report h1 { font-size: 20px; margin: 0 0 4px; }
+  .print-report .report-range { color: #444; margin-bottom: 16px; }
+  .print-report .report-summary { display: flex; gap: 24px; margin-bottom: 20px; font-size: 14px; }
+  .print-report .report-summary b { font-size: 16px; }
+  .print-report table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .print-report th, .print-report td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #ccc; vertical-align: top; }
+  .print-report th { border-bottom: 2px solid #333; }
+  .print-report .report-footer { margin-top: 20px; font-size: 11px; color: #666; }
+
+  @media print {
+    body > *:not(#printReport) { display: none !important; }
+    #printReport { display: block !important; }
+  }
 </style>
 </head>
 <body>
@@ -466,6 +498,14 @@
     <div class="history-bar">
       <button class="back-btn" onclick="closeHistory()">← Back</button>
       <h2>Order History</h2>
+      <button class="report-btn" onclick="toggleReportPanel()">🖨 Print Report</button>
+    </div>
+    <div id="reportPanel" class="report-panel" style="display:none">
+      <label>From</label>
+      <input type="date" id="reportFrom">
+      <label>To</label>
+      <input type="date" id="reportTo">
+      <button class="btn blue" style="width:100%" onclick="generateReport()">Generate &amp; Print</button>
     </div>
     <div class="chip-row">
       <button class="chip active" data-r="today" onclick="setHistoryRange('today')">Today</button>
@@ -593,6 +633,9 @@
     </div>
   </div>
 </div>
+
+<!-- Print-only report (hidden on screen, shown only when printing) -->
+<div id="printReport" class="print-report"></div>
 
 <script>
 /* ================== CONFIG — fill these in from your Supabase project ================== */
@@ -1190,6 +1233,59 @@ function setHistoryDate(val) {
   historyDate = val;
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
   render();
+}
+
+/* ---------- print report ---------- */
+function toggleReportPanel() {
+  const panel = $('reportPanel');
+  const open = panel.style.display === 'none';
+  if (open) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!$('reportFrom').value) $('reportFrom').value = today;
+    if (!$('reportTo').value) $('reportTo').value = today;
+  }
+  panel.style.display = open ? 'flex' : 'none';
+}
+
+function generateReport() {
+  const fromVal = $('reportFrom').value;
+  const toVal = $('reportTo').value;
+  if (!fromVal || !toVal) { alert('Pick both a From and To date.'); return; }
+  const fromDate = new Date(fromVal + 'T00:00:00');
+  const toDate = new Date(toVal + 'T23:59:59');
+  if (fromDate > toDate) { alert('The "From" date must be before the "To" date.'); return; }
+
+  const rows = orders
+    .filter(o => o.status === 'done')
+    .filter(o => { const d = new Date(o.created_at); return d >= fromDate && d <= toDate; })
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const totalRevenue = rows.reduce((sum, o) => sum + (o.total != null ? Number(o.total) : 0), 0);
+  const fromLabel = fromDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  const toLabel = toDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+  const tableRows = rows.map(o => `
+    <tr>
+      <td>${fmtTime(o.created_at)}</td>
+      <td>${esc(o.customer_name)}</td>
+      <td>${esc(o.items).replace(/\n/g, ', ')}</td>
+      <td>${o.total != null ? '$' + Number(o.total).toFixed(2) : '—'}</td>
+    </tr>`).join('');
+
+  $('printReport').innerHTML = `
+    <h1>Viet-Cajun Kitchen — Order Report</h1>
+    <div class="report-range">${fromLabel} – ${toLabel}</div>
+    <div class="report-summary">
+      <div>Total Orders<br><b>${rows.length}</b></div>
+      <div>Total Revenue<br><b>$${totalRevenue.toFixed(2)}</b></div>
+    </div>
+    <table>
+      <thead><tr><th>Date &amp; Time</th><th>Customer</th><th>Items</th><th>Total</th></tr></thead>
+      <tbody>${tableRows || '<tr><td colspan="4">No completed orders in this range.</td></tr>'}</tbody>
+    </table>
+    <div class="report-footer">Generated on ${fmtTime(new Date().toISOString())}</div>
+  `;
+  window.print();
 }
 
 /* ---------- render ---------- */
