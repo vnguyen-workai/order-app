@@ -486,6 +486,7 @@
   <div class="menu-panel" id="menuPanel">
     <button onclick="openHistory()">Order History</button>
     <button onclick="openMenuSettings()">Menu Settings</button>
+    <button id="notifBtn" onclick="enablePush()">🔔 Enable Notifications</button>
   </div>
 
   <div id="boardBar" class="tabs">
@@ -636,6 +637,7 @@ const SUPABASE_URL = 'https://cfoqlxzhtfyahhszcinl.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_mONNhGPjavlxtacViUR0PQ_t1IYJyg3';
 const SHARED_PASSWORD = '1234'; // set your staff password here
 const SETTINGS_PIN = '9999'; // separate PIN to edit the menu (keep employees from changing it by accident)
+const VAPID_PUBLIC_KEY = 'BHR0wapdSyIwldtzAV4GlshLYGY4TVam8Ceev5TEPJ3tDCE0syfDg0O0ZkoPrAt-L-hwfYKvUBQU2sEkvIoCy8E';
 /* ========================================================================================= */
 
 const $ = id => document.getElementById(id);
@@ -1276,7 +1278,16 @@ function onSearch() {
 }
 
 /* ---------- menu ---------- */
-function toggleMenu() { $('menuPanel').classList.toggle('show'); }
+function toggleMenu() {
+  $('menuPanel').classList.toggle('show');
+  updateNotifBtnLabel();
+}
+function updateNotifBtnLabel() {
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const btn = $('notifBtn');
+  if (!supported) { btn.textContent = '🔔 Notifications not supported'; return; }
+  btn.textContent = Notification.permission === 'granted' ? '🔔 Notifications On' : '🔔 Enable Notifications';
+}
 document.addEventListener('click', e => {
   if (!$('menuPanel').contains(e.target) && e.target !== document.querySelector('.menu-btn')) {
     $('menuPanel').classList.remove('show');
@@ -1560,9 +1571,68 @@ function subscribeRealtime() {
     .subscribe();
 }
 
+/* ---------- push notifications ---------- */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js').catch(err => console.error('SW register failed:', err));
+}
+
+async function enablePush() {
+  $('menuPanel').classList.remove('show');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    alert('Notifications aren\'t supported here. Make sure you opened this app from the Home Screen icon (not Safari).');
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      alert('Notifications were not allowed. You can turn them on later in iPhone Settings > Order Board > Notifications.');
+      return;
+    }
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subscriptions').upsert(
+      { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth },
+      { onConflict: 'endpoint' }
+    );
+    if (error) { alert('Could not save notification settings: ' + error.message); return; }
+    alert('Notifications are on. You\'ll get an alert here when a new order comes in.');
+  } catch (err) {
+    console.error(err);
+    alert('Could not enable notifications: ' + err.message);
+  }
+}
+
+/* ---------- deep link: open a specific order from a tapped notification ---------- */
+function openOrderFromUrlIfNeeded() {
+  const params = new URLSearchParams(location.search);
+  const orderId = params.get('order');
+  if (!orderId) return;
+  const o = orders.find(x => x.id === orderId);
+  if (o) openOrderDetail(orderId);
+  history.replaceState(null, '', location.pathname);
+}
+
 /* ---------- boot ---------- */
 function boot() {
-  loadOrders();
+  registerServiceWorker();
+  loadOrders().then(openOrderFromUrlIfNeeded);
   loadMenu();
   subscribeRealtime();
   setInterval(render, 60000); // re-check upcoming vs active as time passes
